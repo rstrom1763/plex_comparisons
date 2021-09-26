@@ -31,9 +31,9 @@ def plex_compare(db1, db2, file, exclude_file=""):
 
     if media_type == "movie":
         for dict in db1:
-            dict1[dict["Title"]] = dict
+            dict1[dict["Title"].lower()] = dict
         for dict in db2:
-            dict2[dict["Title"]] = dict
+            dict2[dict["Title"].lower()] = dict
 
         for movie in dict1:
             if movie not in dict2 and movie not in exclude_file:
@@ -55,7 +55,7 @@ def plex_compare(db1, db2, file, exclude_file=""):
     utils.export_csv(list, file)
 
 # Examples:
-#plex_compare("C:/Strom/KentLibrary.csv", "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv", exclude_file="C:/strom/test.txt")
+#plex_compare("C:/Strom/KentLibrary.csv", "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv")
 #plex_compare("C:/Strom/ryanlibrary.csv", "C:/strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
 #plex_compare("C:/Strom/testing/test1.csv", "C:/Strom/testing/test2.csv", "C:/strom/testing/test_no_have.csv")
 
@@ -154,20 +154,3 @@ def new_user(username, url, password):
     if result.status_code != 200:
         print("Oh no")
 
-
-'''
-data = transcribe_data_json(get_library('http://localhost:32400',
-                                        '4CX8sBFPjAVSfJWohux5', "Movies"))
-
-sync_data(data, "http://10.0.1.2:8081/sync", '4CX8sBFPjAVSfJWohux5')
-'''
-new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
-
-for i in range(134):
-    new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
-    print(i)
-
-'''
-download_diff('http://localhost:8081/diff',
-              '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")
-'''
