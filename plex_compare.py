@@ -113,7 +113,7 @@ def sync_data(json, url, token):
 
     headers_dict = {"token": token,
                     'Content-type': 'application/json', 'Accept': 'text/plain'}
-    requests.post(url, headers=headers_dict, data=json)
+    requests.post(url, headers=headers_dict, data=json, verify=False)
 
 
 def download_diff(url, token, out_file):
@@ -125,12 +125,13 @@ def download_diff(url, token, out_file):
 
     out_file = open(out_file, 'w', encoding='utf-8')
 
-    out_file.write(requests.get(url, headers=headers_dict).json())
+    out_file.write(requests.get(
+        url, headers=headers_dict, verify=False).json())
 
     out_file.close()
 
 
-def new_user(username, url):
+def new_user(username, url, password):
     import requests
     import string
     import random
@@ -138,13 +139,20 @@ def new_user(username, url):
 
     N = 20
     token = ''.join(random.SystemRandom().choice(
-        string.ascii_uppercase + string.digits) for _ in range(N))
+        string.ascii_letters + string.digits) for _ in range(N))
 
-    headers_dict = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers_dict = {'Content-type': 'application/json',
+                    'Accept': 'text/plain', 'access_token': token}
 
-    data_json = {'username': username, 'access_token': token}
+    data_json = {'username': username,
+                 'access_token': token, 'password': password}
+
     data_json = json.dumps(data_json)
-    requests.post(url, headers=headers_dict, data=data_json)
+    result = requests.post(url, headers=headers_dict,
+                           data=data_json, verify=False)
+
+    if result.status_code != 200:
+        print("Oh no")
 
 
 '''
@@ -153,7 +161,11 @@ data = transcribe_data_json(get_library('http://localhost:32400',
 
 sync_data(data, "http://10.0.1.2:8081/sync", '4CX8sBFPjAVSfJWohux5')
 '''
-new_user('test', 'http://10.0.1.2:8081/newuser')
+new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
+
+for i in range(134):
+    new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
+    print(i)
 
 '''
 download_diff('http://localhost:8081/diff',
