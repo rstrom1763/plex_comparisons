@@ -34,33 +34,46 @@ def plex_compare(db1, db2, file, exclude_file=""):
             dict1[dict["Title"].lower()] = dict
         for dict in db2:
             dict2[dict["Title"].lower()] = dict
-
         for movie in dict1:
             if movie not in dict2 and movie not in exclude_file:
                 list.append(dict1[movie])
     elif media_type == "tv":
         for dict in db1:
-            print(dict["Episode Title"])
-        for dict in db1:
-            dict1[dict["Episode Title"]] = dict
+            if dict["Episode Title"].lower() not in dict1:
+                dict1[dict["Episode Title"].lower()] = dict
+            else:
+                # left off here on rooting out duplicate show names
+                print('duplicate episode name')
+                return
         for dict in db2:
-            dict2[dict["Episode Title"]] = dict
+            if dict["Episode Title"].lower() not in dict1:
+                dict2[dict["Episode Title"].lower()] = dict
+        for episode in dict1:
+            if episode not in dict2 and episode not in exclude_file:
+                list.append(dict1[episode])
+            elif dict1[episode]['Series Title'] != dict2[episode]['Series Title']:
+                list.append(dict1[episode])
+    else:
+        print("Error")
+        return
 
     # Iterated through the dictionaries to print required file space
-    for movie in list:
-        if movie["Part Size as Bytes"].isdecimal():
-            space_needed += int(movie["Part Size as Bytes"])
+    for item in list:
+        if item["Part Size as Bytes"].isdecimal():
+            space_needed += int(item["Part Size as Bytes"])
     print(utils.human_readable(space_needed))
 
     utils.export_csv(list, file)
 
+
 # Examples:
 #plex_compare("C:/Strom/KentLibrary.csv", "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv")
-#plex_compare("C:/Strom/ryanlibrary.csv", "C:/strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
-#plex_compare("C:/Strom/testing/test1.csv", "C:/Strom/testing/test2.csv", "C:/strom/testing/test_no_have.csv")
-
+#plex_compare("C:/Strom/kent_shows.csv", "C:/strom/ryan_shows.csv","C:/strom/ryan_shows_no_have.csv")
+#plex_compare("C:/Strom/ryan_shows.csv", "C:/strom/kent_shows.csv","C:/strom/kent_shows_no_have.csv")
 
 # Returns list of items from specified Plex library
+
+
 def get_library(url, token, library):
 
     from plexapi.server import PlexServer
@@ -154,3 +167,15 @@ def new_user(username, url, password):
     if result.status_code != 200:
         print("Oh no")
 
+
+'''
+data = transcribe_data_json(get_library('http://localhost:32400',
+                                        '4CX8sBFPjAVSfJWohux5', "Movies"))
+sync_data(data, "http://10.0.1.2:8081/sync", '4CX8sBFPjAVSfJWohux5')
+'''
+#new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
+
+'''
+download_diff('http://localhost:8081/diff',
+              '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")
+'''

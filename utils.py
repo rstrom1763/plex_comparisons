@@ -55,6 +55,7 @@ def export_csv(dict_list, file):
 
     file.close  # Close output file to free the memory
 
+
 def human_readable(num, suffix='B'):
     # Returns inputted byte count as human readable text
 
