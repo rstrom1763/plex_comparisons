@@ -14,7 +14,7 @@ def plex_compare(db1, db2, file, exclude_file=""):
         for line in exclude_file:
             exclude_file[exclude_file.index(line)] = line.replace("\n", "")
 
-    # Import both CSV's into list of dictionaries
+    # Import both DB files into list of dictionaries
     if ".csv" in db1:
         db1 = utils.import_csv(db1)
     elif ".json" in db1:
@@ -52,25 +52,34 @@ def plex_compare(db1, db2, file, exclude_file=""):
                 list.append(dict1[movie])
     elif media_type == "tv":
         for dict in db1:
-            if dict["Episode Title"].lower() not in dict1:
-                dict1[dict["Episode Title"].lower()] = dict
-            else:
-                # left off here on rooting out duplicate show names
-                print('duplicate episode name')
-                return
-        for dict in db2:
-            if dict["Episode Title"].lower() not in dict1:
-                dict2[dict["Episode Title"].lower()] = dict
-        for episode in dict1:
-            if episode not in dict2 and episode not in exclude_file:
-                list.append(dict1[episode])
-            elif dict1[episode]['Series Title'] != dict2[episode]['Series Title']:
-                list.append(dict1[episode])
-    else:
-        print("Error")
-        return
+            if dict['Series Title'].lower() not in dict1:
+                dict1[dict["Series Title"].lower()] = {}
+                dict1[dict['Series Title'].lower()][dict['Episode Title'].lower()] = dict
+            elif dict['Episode Title'].lower() not in dict1[dict['Series Title'].lower()]:
+                dict1[dict['Series Title'].lower()][dict['Episode Title'].lower()] = dict
 
-    # Iterated through the dictionaries to print required file space
+        for dict in db2:
+            if dict['Series Title'].lower() not in dict2:
+                dict2[dict["Series Title"].lower()] = {}
+                dict2[dict['Series Title'].lower()][dict['Episode Title'].lower()] = dict
+            elif dict['Episode Title'].lower() not in dict2[dict['Series Title'].lower()]:
+                dict2[dict['Series Title'].lower()][dict['Episode Title'].lower()] = dict
+        
+        for show in dict1.values():
+            for episode in show.values():
+                if episode['Series Title'].lower() not in dict2:
+                    list.append(episode)
+                else:
+                    found = False
+                    for show2 in dict2.values():
+                        if found == True : break
+                        for episode2 in show2.values():
+                            if episode['Episode Title'].lower() in episode2['Episode Title'].lower() and episode['Series Title'].lower() in episode2['Series Title'].lower():
+                                found = True
+                                break
+                    if found == False : list.append(episode)
+                                
+# Iterated through the dictionaries to print required file space
     for item in list:
         if item["Part Size as Bytes"].isdecimal():
             space_needed += int(item["Part Size as Bytes"])
@@ -173,14 +182,15 @@ def new_user(username, url, password):
         print("Oh no")
 
 
-
 # Examples:
+'''
 plex_compare("C:/Strom/KentLibrary.csv",
              "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv")
 plex_compare("C:/Strom/ryanLibrary.csv",
              "C:/Strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
-#plex_compare("C:/Strom/kent_shows.csv", "C:/strom/ryan_shows.csv","C:/strom/ryan_shows_no_have.csv")
-#plex_compare("C:/Strom/ryan_shows.csv", "C:/strom/kent_shows.csv","C:/strom/kent_shows_no_have.csv")
+'''
+plex_compare("C:/Strom/kent_shows.csv", "C:/strom/ryan_shows.csv","C:/strom/ryan_shows_no_have.csv")
+plex_compare("C:/Strom/ryan_shows.csv", "C:/strom/kent_shows.csv","C:/strom/kent_shows_no_have.csv")
 
 # Returns list of items from specified Plex library
 
@@ -191,6 +201,5 @@ sync_data(data, "https://localhost:8081/sync", '4CX8sBFPjAVSfJWohux5')
 '''
 #new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
 
-
-download_diff('https://plex:8081/diff',
-              '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")
+'''download_diff('https://plex:8081/diff',
+              '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")'''
