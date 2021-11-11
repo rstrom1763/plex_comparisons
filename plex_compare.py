@@ -6,6 +6,7 @@
 def plex_compare(db1, db2, file, exclude_file=""):
 
     import utils
+    import json
 
     space_needed = 0
     if exclude_file != "":
@@ -14,8 +15,20 @@ def plex_compare(db1, db2, file, exclude_file=""):
             exclude_file[exclude_file.index(line)] = line.replace("\n", "")
 
     # Import both CSV's into list of dictionaries
-    db1 = utils.import_csv(db1)
-    db2 = utils.import_csv(db2)
+    if ".csv" in db1:
+        db1 = utils.import_csv(db1)
+    elif ".json" in db1:
+        db1 = json.load(db1)
+    else:
+        print("Unknown data type")
+        return
+    if ".csv" in db2:
+        db2 = utils.import_csv(db2)
+    elif ".json" in db2:
+        db2 = json.load(db2)
+    else:
+        print("Unknown data type")
+        return
 
     dict1 = {}
     dict2 = {}
@@ -64,14 +77,6 @@ def plex_compare(db1, db2, file, exclude_file=""):
     print(utils.human_readable(space_needed))
 
     utils.export_csv(list, file)
-
-
-# Examples:
-#plex_compare("C:/Strom/KentLibrary.csv", "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv")
-#plex_compare("C:/Strom/kent_shows.csv", "C:/strom/ryan_shows.csv","C:/strom/ryan_shows_no_have.csv")
-#plex_compare("C:/Strom/ryan_shows.csv", "C:/strom/kent_shows.csv","C:/strom/kent_shows_no_have.csv")
-
-# Returns list of items from specified Plex library
 
 
 def get_library(url, token, library):
@@ -168,14 +173,24 @@ def new_user(username, url, password):
         print("Oh no")
 
 
+
+# Examples:
+plex_compare("C:/Strom/KentLibrary.csv",
+             "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv")
+plex_compare("C:/Strom/ryanLibrary.csv",
+             "C:/Strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
+#plex_compare("C:/Strom/kent_shows.csv", "C:/strom/ryan_shows.csv","C:/strom/ryan_shows_no_have.csv")
+#plex_compare("C:/Strom/ryan_shows.csv", "C:/strom/kent_shows.csv","C:/strom/kent_shows_no_have.csv")
+
+# Returns list of items from specified Plex library
+
 '''
 data = transcribe_data_json(get_library('http://localhost:32400',
                                         '4CX8sBFPjAVSfJWohux5', "Movies"))
-sync_data(data, "http://10.0.1.2:8081/sync", '4CX8sBFPjAVSfJWohux5')
+sync_data(data, "https://localhost:8081/sync", '4CX8sBFPjAVSfJWohux5')
 '''
 #new_user('test', 'https://plex.localdomain:8081/newuser', 'testPassword')
 
-'''
-download_diff('http://localhost:8081/diff',
+
+download_diff('https://plex:8081/diff',
               '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")
-'''
