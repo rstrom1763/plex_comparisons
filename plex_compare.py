@@ -85,7 +85,7 @@ def plex_compare(db1, db2, file, exclude_file=""):
                     if found == False:
                         list.append(episode)
 
-# Iterated through the dictionaries to print required file space
+# Iterates through the dictionaries to print required file space
     for item in list:
         if item["FileSizeBytes"].isdecimal():
             space_needed += int(item["FileSizeBytes"])
@@ -108,15 +108,17 @@ def transcribe_data_csv(files, out_file):
 
     out_file = open(out_file, 'w', encoding="utf-8")
 
-    out_file.write('"{}","{}","{}","{}","{}","{}","{}"\n'.format(
-        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "FilePath"))
+    out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
 
     for file in files:
         size = file.media[0].parts[0].size
         bitrate = file.media[0].bitrate
         resolution = file.media[0].videoResolution
-        out_file.write('"{}","{}","{}","{}","{}","{}","{}"\n'.format(
-            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, file.locations[0]))
+        container = file.media[0].parts[0].container
+        videoCodec = file.media[0].videoCodec
+        out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
 
     out_file.close()
 
@@ -134,8 +136,10 @@ def transcribe_data_json(files):
         file_size_human = utils.human_readable(size)
         bitrate = file.media[0].bitrate
         resolution = file.media[0].videoResolution
+        container = file.media[0].parts[0].container
+        videoCodec = file.media[0].videoCodec
         dict[file.title] = {"title": file.title, "year": file.year,
-                            "file_size_human_readable": file_size_human, "file_size_bytes": size, "filepath": file.locations[0], "duration": file.duration, "bitrate": bitrate, "resolution": resolution}
+                            "file_size_human_readable": file_size_human, "file_size_bytes": size, "bitrate": bitrate, "resolution": resolution,  "codec": videoCodec, "container": container, "filepath": file.locations[0]}
 
     return json.dumps(dict)
 
@@ -189,13 +193,12 @@ def new_user(username, url, password):
 
 
 # Examples:
-'''transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5', "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
+transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5',
+                    "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
 
 
-plex_compare("C:/Strom/KentLibraryTest.csv",
+'''plex_compare("C:/Strom/KentLibraryTest.csv",
              "C:/Strom/ryanlibrarytest.csv", "C:/strom/ryan_no_have.csv")
 plex_compare("C:/Strom/ryanlibrarytest.csv",
              "C:/Strom/kentlibraryTest.csv", "C:/strom/kent_no_have.csv")
 '''
-
-
