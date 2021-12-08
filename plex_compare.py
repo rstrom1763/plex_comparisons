@@ -87,8 +87,8 @@ def plex_compare(db1, db2, file, exclude_file=""):
 
 # Iterated through the dictionaries to print required file space
     for item in list:
-        if item["Part Size as Bytes"].isdecimal():
-            space_needed += int(item["Part Size as Bytes"])
+        if item["FileSizeBytes"].isdecimal():
+            space_needed += int(item["FileSizeBytes"])
     print(utils.human_readable(space_needed))
 
     utils.export_csv(list, file)
@@ -109,14 +109,14 @@ def transcribe_data_csv(files, out_file):
     out_file = open(out_file, 'w', encoding="utf-8")
 
     out_file.write('"{}","{}","{}","{}","{}","{}","{}"\n'.format(
-        "Title", "Year", "FileSize", "FileSizeBytes", "FilePath", "bitrate", "resolution"))
+        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "FilePath"))
 
     for file in files:
         size = file.media[0].parts[0].size
         bitrate = file.media[0].bitrate
         resolution = file.media[0].videoResolution
         out_file.write('"{}","{}","{}","{}","{}","{}","{}"\n'.format(
-            file.title, file.year, utils.human_readable(size), size, file.locations[0], bitrate, resolution))
+            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, file.locations[0]))
 
     out_file.close()
 
@@ -189,12 +189,13 @@ def new_user(username, url, password):
 
 
 # Examples:
-test = transcribe_data_csv(get_library(
-    'http://plex:32400', '4CX8sBFPjAVSfJWohux5', "Movies"), out_file="C:/strom/test.csv")
-'''
-plex_compare("C:/Strom/KentLibrary.csv",
-             "C:/Strom/ryan_scripted_library.csv", "C:/strom/ryan_no_have.csv")
-plex_compare("C:/Strom/ryan_scripted_library.csv",
-             "C:/Strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
+'''transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5', "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
 
+
+plex_compare("C:/Strom/KentLibraryTest.csv",
+             "C:/Strom/ryanlibrarytest.csv", "C:/strom/ryan_no_have.csv")
+plex_compare("C:/Strom/ryanlibrarytest.csv",
+             "C:/Strom/kentlibraryTest.csv", "C:/strom/kent_no_have.csv")
 '''
+
+
