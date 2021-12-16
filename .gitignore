@@ -3,6 +3,7 @@ node_modules/
 package-lock.json
 package.json
 
+my_config.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

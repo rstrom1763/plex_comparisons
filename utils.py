@@ -53,7 +53,8 @@ def export_csv(dict_list, file):
             file.write('"' + dict[header].replace("\n", "") + '",')
         file.write("\n")
 
-    file.close  # Close output file to free the memory
+    file.close  # Close output file to free the memory and finalize the writes
+
 
 def human_readable(num, suffix='B'):
     # Returns inputted byte count as human readable text

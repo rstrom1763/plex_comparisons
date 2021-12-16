@@ -6,6 +6,7 @@
 def plex_compare(db1, db2, file, exclude_file=""):
 
     import utils
+    import json
 
     space_needed = 0
     if exclude_file != "":
@@ -13,9 +14,21 @@ def plex_compare(db1, db2, file, exclude_file=""):
         for line in exclude_file:
             exclude_file[exclude_file.index(line)] = line.replace("\n", "")
 
-    # Import both CSV's into list of dictionaries
-    db1 = utils.import_csv(db1)
-    db2 = utils.import_csv(db2)
+    # Import both DB files into list of dictionaries
+    if ".csv" in db1:
+        db1 = utils.import_csv(db1)
+    elif ".json" in db1:
+        db1 = json.load(db1)
+    else:
+        print("Unknown data type")
+        return
+    if ".csv" in db2:
+        db2 = utils.import_csv(db2)
+    elif ".json" in db2:
+        db2 = json.load(db2)
+    else:
+        print("Unknown data type")
+        return
 
     dict1 = {}
     dict2 = {}
@@ -31,36 +44,56 @@ def plex_compare(db1, db2, file, exclude_file=""):
 
     if media_type == "movie":
         for dict in db1:
-            dict1[dict["Title"]] = dict
+            dict1[dict["Title"].lower()] = dict
         for dict in db2:
-            dict2[dict["Title"]] = dict
-
+            dict2[dict["Title"].lower()] = dict
         for movie in dict1:
             if movie not in dict2 and movie not in exclude_file:
                 list.append(dict1[movie])
     elif media_type == "tv":
         for dict in db1:
-            print(dict["Episode Title"])
-        for dict in db1:
-            dict1[dict["Episode Title"]] = dict
-        for dict in db2:
-            dict2[dict["Episode Title"]] = dict
+            if dict['Series Title'].lower() not in dict1:
+                dict1[dict["Series Title"].lower()] = {}
+                dict1[dict['Series Title'].lower(
+                )][dict['Episode Title'].lower()] = dict
+            elif dict['Episode Title'].lower() not in dict1[dict['Series Title'].lower()]:
+                dict1[dict['Series Title'].lower(
+                )][dict['Episode Title'].lower()] = dict
 
-    # Iterated through the dictionaries to print required file space
-    for movie in list:
-        if movie["Part Size as Bytes"].isdecimal():
-            space_needed += int(movie["Part Size as Bytes"])
+        for dict in db2:
+            if dict['Series Title'].lower() not in dict2:
+                dict2[dict["Series Title"].lower()] = {}
+                dict2[dict['Series Title'].lower(
+                )][dict['Episode Title'].lower()] = dict
+            elif dict['Episode Title'].lower() not in dict2[dict['Series Title'].lower()]:
+                dict2[dict['Series Title'].lower(
+                )][dict['Episode Title'].lower()] = dict
+
+        for show in dict1.values():
+            for episode in show.values():
+                if episode['Series Title'].lower() not in dict2:
+                    list.append(episode)
+                else:
+                    found = False
+                    for show2 in dict2.values():
+                        if found == True:
+                            break
+                        for episode2 in show2.values():
+                            if episode['Episode Title'].lower() in episode2['Episode Title'].lower() and episode['Series Title'].lower() in episode2['Series Title'].lower():
+                                found = True
+                                break
+                    if found == False:
+                        list.append(episode)
+
+# Iterates through the dictionaries to print required file space
+    for item in list:
+        if item["FileSizeBytes"].isdecimal():
+            space_needed += int(item["FileSizeBytes"])
     print(utils.human_readable(space_needed))
 
     utils.export_csv(list, file)
 
-# Examples:
-#plex_compare("C:/Strom/KentLibrary.csv", "C:/Strom/ryanlibrary.csv", "C:/strom/ryan_no_have.csv", exclude_file="C:/strom/test.txt")
-#plex_compare("C:/Strom/ryanlibrary.csv", "C:/strom/kentlibrary.csv", "C:/strom/kent_no_have.csv")
-#plex_compare("C:/Strom/testing/test1.csv", "C:/Strom/testing/test2.csv", "C:/strom/testing/test_no_have.csv")
 
-
-# Returns list of items from specified Plex library
 def get_library(url, token, library):
 
     from plexapi.server import PlexServer
@@ -71,24 +104,27 @@ def get_library(url, token, library):
 
 def transcribe_data_csv(files, out_file):
 
-    import os
     import utils
 
     out_file = open(out_file, 'w', encoding="utf-8")
 
-    out_file.write('"{}","{}","{}","{}","{}"\n'.format(
-        "Title", "Year", "FileSize", "FilePath", "Duration"))
+    out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
 
     for file in files:
-        out_file.write('"{}","{}","{}","{}","{}"\n'.format(
-            file.title, file.year, utils.human_readable(os.path.getsize(file.locations[0])), file.locations[0]), file.duration)
+        size = file.media[0].parts[0].size
+        bitrate = file.media[0].bitrate
+        resolution = file.media[0].videoResolution
+        container = file.media[0].parts[0].container
+        videoCodec = file.media[0].videoCodec
+        out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
 
     out_file.close()
 
 
 def transcribe_data_json(files):
 
-    import os
     import utils
     import json
 
@@ -96,13 +132,14 @@ def transcribe_data_json(files):
 
     for file in files:
 
-        file_size_human = utils.human_readable(
-            os.path.getsize(file.locations[0]))
-
-        file_size_bytes = os.path.getsize(file.locations[0])
-
+        size = file.media[0].parts[0].size
+        file_size_human = utils.human_readable(size)
+        bitrate = file.media[0].bitrate
+        resolution = file.media[0].videoResolution
+        container = file.media[0].parts[0].container
+        videoCodec = file.media[0].videoCodec
         dict[file.title] = {"title": file.title, "year": file.year,
-                            "file_size_human_readable": file_size_human, "file_size_bytes": file_size_bytes, "filepath": file.locations[0], "duration": file.duration}
+                            "file_size_human_readable": file_size_human, "file_size_bytes": size, "bitrate": bitrate, "resolution": resolution,  "codec": videoCodec, "container": container, "filepath": file.locations[0]}
 
     return json.dumps(dict)
 
@@ -113,7 +150,7 @@ def sync_data(json, url, token):
 
     headers_dict = {"token": token,
                     'Content-type': 'application/json', 'Accept': 'text/plain'}
-    requests.post(url, headers=headers_dict, data=json)
+    requests.post(url, headers=headers_dict, data=json, verify=False)
 
 
 def download_diff(url, token, out_file):
@@ -125,12 +162,13 @@ def download_diff(url, token, out_file):
 
     out_file = open(out_file, 'w', encoding='utf-8')
 
-    out_file.write(requests.get(url, headers=headers_dict).json())
+    out_file.write(requests.get(
+        url, headers=headers_dict, verify=False).json())
 
     out_file.close()
 
 
-def new_user(username, url):
+def new_user(username, url, password):
     import requests
     import string
     import random
@@ -138,24 +176,29 @@ def new_user(username, url):
 
     N = 20
     token = ''.join(random.SystemRandom().choice(
-        string.ascii_uppercase + string.digits) for _ in range(N))
+        string.ascii_letters + string.digits) for _ in range(N))
 
-    headers_dict = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers_dict = {'Content-type': 'application/json',
+                    'Accept': 'text/plain', 'access_token': token}
 
-    data_json = {'username': username, 'access_token': token}
+    data_json = {'username': username,
+                 'access_token': token, 'password': password}
+
     data_json = json.dumps(data_json)
-    requests.post(url, headers=headers_dict, data=data_json)
+    result = requests.post(url, headers=headers_dict,
+                           data=data_json, verify=False)
+
+    if result.status_code != 200:
+        print("Oh no")
 
 
-'''
-data = transcribe_data_json(get_library('http://localhost:32400',
-                                        '4CX8sBFPjAVSfJWohux5', "Movies"))
+# Examples:
+transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5',
+                    "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
 
-sync_data(data, "http://10.0.1.2:8081/sync", '4CX8sBFPjAVSfJWohux5')
-'''
-new_user('test', 'http://10.0.1.2:8081/newuser')
 
-'''
-download_diff('http://localhost:8081/diff',
-              '4CX8sBFPjAVSfJWohux5', "C:/strom/test.json")
+'''plex_compare("C:/Strom/KentLibraryTest.csv",
+             "C:/Strom/ryanlibrarytest.csv", "C:/strom/ryan_no_have.csv")
+plex_compare("C:/Strom/ryanlibrarytest.csv",
+             "C:/Strom/kentlibraryTest.csv", "C:/strom/kent_no_have.csv")
 '''
