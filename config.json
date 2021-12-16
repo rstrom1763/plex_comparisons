@@ -1,6 +1,6 @@
 {
-    "plex_url": "",
-    "sync_url": "",
-    "download_diff_url": "",
-    "plex_token": ""
+    "plex_token": "",
+    "plex_server_ip": "",
+    "output_csv": "",
+    "library_name": ""
 }
