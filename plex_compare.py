@@ -190,15 +190,3 @@ def new_user(username, url, password):
 
     if result.status_code != 200:
         print("Oh no")
-
-
-# Examples:
-transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5',
-                    "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
-
-
-'''plex_compare("C:/Strom/KentLibraryTest.csv",
-             "C:/Strom/ryanlibrarytest.csv", "C:/strom/ryan_no_have.csv")
-plex_compare("C:/Strom/ryanlibrarytest.csv",
-             "C:/Strom/kentlibraryTest.csv", "C:/strom/kent_no_have.csv")
-'''
