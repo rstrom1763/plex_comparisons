@@ -34,56 +34,13 @@ def plex_compare(db1, db2, file, exclude_file=""):
     dict2 = {}
     list = []
 
-    if "Season" in db1[0] and "Season" in db2[0]:
-        media_type = "tv"
-    elif "Season" not in db1[0] and "Season" not in db2[0]:
-        media_type = "movie"
-    else:
-        print("Error: Mismatching DB Types")
-        return
-
-    if media_type == "movie":
-        for dict in db1:
-            dict1[dict["Title"].lower()] = dict
-        for dict in db2:
-            dict2[dict["Title"].lower()] = dict
-        for movie in dict1:
-            if movie not in dict2 and movie not in exclude_file:
-                list.append(dict1[movie])
-    elif media_type == "tv":
-        for dict in db1:
-            if dict['Series Title'].lower() not in dict1:
-                dict1[dict["Series Title"].lower()] = {}
-                dict1[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-            elif dict['Episode Title'].lower() not in dict1[dict['Series Title'].lower()]:
-                dict1[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-
-        for dict in db2:
-            if dict['Series Title'].lower() not in dict2:
-                dict2[dict["Series Title"].lower()] = {}
-                dict2[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-            elif dict['Episode Title'].lower() not in dict2[dict['Series Title'].lower()]:
-                dict2[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-
-        for show in dict1.values():
-            for episode in show.values():
-                if episode['Series Title'].lower() not in dict2:
-                    list.append(episode)
-                else:
-                    found = False
-                    for show2 in dict2.values():
-                        if found == True:
-                            break
-                        for episode2 in show2.values():
-                            if episode['Episode Title'].lower() in episode2['Episode Title'].lower() and episode['Series Title'].lower() in episode2['Series Title'].lower():
-                                found = True
-                                break
-                    if found == False:
-                        list.append(episode)
+    for dict in db1:
+        dict1[dict["Title"].lower()] = dict
+    for dict in db2:
+        dict2[dict["Title"].lower()] = dict
+    for movie in dict1:
+        if movie not in dict2 and movie not in exclude_file:
+            list.append(dict1[movie])
 
 # Iterates through the dictionaries to print required file space
     for item in list:
@@ -99,26 +56,53 @@ def get_library(url, token, library):
     from plexapi.server import PlexServer
 
     # print(type(test[0].locations))
-    return ((PlexServer(url, token)).library.section(library)).search()
+    results = ((PlexServer(url, token)).library.section(library)).search()
+
+    # If the library is TV Shows, return a list of episode objects
+    if  hasattr(results[0], 'season'):
+        episode_list = []
+        for show in results:
+            for season in show.seasons():
+                for episode in season.episodes():
+                    episode.title = "{} : {}".format(show.title, episode.title)
+                    episode_list += episode
+        return episode_list, "show"
+
+    # Else return the movie file list
+    return results, "movie"
 
 
-def transcribe_data_csv(files, out_file):
+def transcribe_data_csv(files, out_file, type):
 
     import utils
 
     out_file = open(out_file, 'w', encoding="utf-8")
 
-    out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
-
-    for file in files:
-        size = file.media[0].parts[0].size
-        bitrate = file.media[0].bitrate
-        resolution = file.media[0].videoResolution
-        container = file.media[0].parts[0].container
-        videoCodec = file.media[0].videoCodec
+    if type == "movie":
         out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
+            "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
+
+        for file in files:
+            size = file.media[0].parts[0].size
+            bitrate = file.media[0].bitrate
+            resolution = file.media[0].videoResolution
+            container = file.media[0].parts[0].container
+            videoCodec = file.media[0].videoCodec
+            out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+                file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
+
+    if type == "show":
+        out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+            "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
+
+        for file in files:
+            size = file.media[0].parts[0].size
+            bitrate = file.media[0].bitrate
+            resolution = file.media[0].videoResolution
+            container = file.media[0].parts[0].container
+            videoCodec = file.media[0].videoCodec
+            out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+                file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
 
     out_file.close()
 
@@ -148,8 +132,7 @@ def sync_data(json, url, token):
 
     import requests
 
-    headers_dict = {"token": token,
-                    'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers_dict = {"token": token, 'Content-type': 'application/json', 'Accept': 'text/plain'}
     requests.post(url, headers=headers_dict, data=json, verify=False)
 
 
@@ -162,8 +145,7 @@ def download_diff(url, token, out_file):
 
     out_file = open(out_file, 'w', encoding='utf-8')
 
-    out_file.write(requests.get(
-        url, headers=headers_dict, verify=False).json())
+    out_file.write(requests.get(url, headers=headers_dict, verify=False).json())
 
     out_file.close()
 
@@ -175,18 +157,14 @@ def new_user(username, url, password):
     import json
 
     N = 20
-    token = ''.join(random.SystemRandom().choice(
-        string.ascii_letters + string.digits) for _ in range(N))
+    token = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(N))
 
-    headers_dict = {'Content-type': 'application/json',
-                    'Accept': 'text/plain', 'access_token': token}
+    headers_dict = {'Content-type': 'application/json', 'Accept': 'text/plain', 'access_token': token}
 
-    data_json = {'username': username,
-                 'access_token': token, 'password': password}
+    data_json = {'username': username,'access_token': token, 'password': password}
 
     data_json = json.dumps(data_json)
-    result = requests.post(url, headers=headers_dict,
-                           data=data_json, verify=False)
+    result = requests.post(url, headers=headers_dict, data=data_json, verify=False)
 
     if result.status_code != 200:
         print("Oh no")
