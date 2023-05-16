@@ -62,10 +62,13 @@ while True:
 
         if exclude_file == 'y':
             exclude_file = input("Please enter path to the exclude file: ")
+            clear()
             pc.plex_compare(db1, db2, output_file, exclude_file)
         elif exclude_file == "n":
+            clear()
             pc.plex_compare(db1, db2, output_file)
         else:
+            clear()
             print("Invalid option!\n\n")
             continue
     
