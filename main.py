@@ -50,9 +50,10 @@ while True:
 
         # Print out some basic instructions
         clear()
-        print("Exports media that is in the first CSV but not in the second")
-        print("Inputs are file paths to the csv library files")
-        print("Output is another CSV file\n\n")
+        print("Finds entries that are in the first CSV but not in the second")
+        print("Inputs are file paths to CSV files exported with this script using the \"Query Plex Server\" option")
+        print("Output is another CSV file")
+        print("Make sure the CSVs to be compared are of the same media type(Movie or Show)\n\n")
 
         db1 = input("Please enter path to CSV1: ")
         db2 = input("Please enter path to CSV2: ")
