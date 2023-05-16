@@ -1,7 +1,6 @@
 import json
 import plex_compare as pc
 import os
-import time
 from platform import system
 
 system_os = system() # Get the type of system this script is running on. (Windows or Linux)
