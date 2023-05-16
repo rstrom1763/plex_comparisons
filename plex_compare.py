@@ -66,43 +66,29 @@ def get_library(url, token, library):
                 for episode in season.episodes():
                     episode.title = "{} : {}".format(show.title, episode.title)
                     episode_list += episode
-        return episode_list, "show"
+        return episode_list
 
     # Else return the movie file list
-    return results, "movie"
+    return results
 
 
-def transcribe_data_csv(files, out_file, type):
+def transcribe_data_csv(files, out_file):
 
     import utils
 
     out_file = open(out_file, 'w', encoding="utf-8")
 
-    if type == "movie":
+    out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
+        "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
+
+    for file in files:
+        size = file.media[0].parts[0].size
+        bitrate = file.media[0].bitrate
+        resolution = file.media[0].videoResolution
+        container = file.media[0].parts[0].container
+        videoCodec = file.media[0].videoCodec
         out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-            "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
-
-        for file in files:
-            size = file.media[0].parts[0].size
-            bitrate = file.media[0].bitrate
-            resolution = file.media[0].videoResolution
-            container = file.media[0].parts[0].container
-            videoCodec = file.media[0].videoCodec
-            out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-                file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
-
-    if type == "show":
-        out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-            "Title", "Year", "FileSize", "FileSizeBytes", "bitrate", "resolution", "codec", "container", "FilePath"))
-
-        for file in files:
-            size = file.media[0].parts[0].size
-            bitrate = file.media[0].bitrate
-            resolution = file.media[0].videoResolution
-            container = file.media[0].parts[0].container
-            videoCodec = file.media[0].videoCodec
-            out_file.write('"{}","{}","{}","{}","{}","{}","{}","{}","{}"\n'.format(
-                file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
+            file.title, file.year, utils.human_readable(size), size, bitrate, resolution, videoCodec, container, file.locations[0]))
 
     out_file.close()
 
