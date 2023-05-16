@@ -24,6 +24,12 @@ while True:
     conf = json.load(conf_file) # Load conf_file contents as json to the var conf
     conf_file.close() # Close the conf file
 
+    for item in conf:
+        if conf[item] == "":
+            conf[item] = input("Please input config value for " + item + ": ")
+            open("./config.json",'w').write(json.dumps(conf))
+            clear()
+
     choice = int(input(menu)) # Prompts user for their menu choice
     
     if choice == 1:
