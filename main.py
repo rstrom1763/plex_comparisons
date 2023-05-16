@@ -15,7 +15,8 @@ def clear(): # Clear the terminal
 menu = \
 """\n1. Query Plex server
 2. Compare libraries
-3. Exit\n
+3. Reset config file
+4. Exit\n
 Please select an option: """
 
 clear()
@@ -69,6 +70,13 @@ while True:
             continue
     
     elif choice == 3:
+        for item in conf:
+            conf[item] = ""
+        open("./config.json",'w').write(json.dumps(conf))
+        clear()
+        print("Config file has been reset!\n\n")
+    
+    elif choice == 4:
         clear()
         print("Exiting...\n\n")
         exit()
