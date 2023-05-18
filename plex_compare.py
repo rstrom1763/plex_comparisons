@@ -8,7 +8,9 @@ def plex_compare(db1, db2, file, exclude_file=""):
     import utils
     import json
 
-    space_needed = 0
+    space_needed = 0 # Variable to hold the number of bytes difference between the two libraries
+
+    # Load the exclude file into a list and remove newline characters
     if exclude_file != "":
         exclude_file = (open(exclude_file, 'r', encoding='utf-8')).readlines()
         for line in exclude_file:
@@ -30,14 +32,21 @@ def plex_compare(db1, db2, file, exclude_file=""):
         print("Unknown data type")
         return
 
-    dict1 = {}
-    dict2 = {}
-    list = []
+    dict1 = {} # Dict that db1 will be loaded into
+    dict2 = {} # Dict that db2 will be loaded into
+    list = [] # List of media items that are found in the first db but not the second. For final output
 
+    # Load the db data into the dicts
+    # Title of the media item becomes the key
+    # The whole individual dict becomes the value
     for dict in db1:
         dict1[dict["Title"].lower()] = dict
     for dict in db2:
         dict2[dict["Title"].lower()] = dict
+
+    # Perform the compare
+    # Loops through all of the media items in dict1 and adds andything not also in dict 2 to "list"
+    # Also needs to not be in the exclude file
     for movie in dict1:
         if movie not in dict2 and movie not in exclude_file:
             list.append(dict1[movie])
@@ -48,9 +57,12 @@ def plex_compare(db1, db2, file, exclude_file=""):
             space_needed += int(item["FileSizeBytes"])
     print(utils.human_readable(space_needed))
 
-    utils.export_csv(list, file)
+    utils.export_csv(list, file) # Writes the resulting data to a csv file
 
-
+# Queries the Plex Server for the library data
+# Url is the dns name or the ip address of the plex server you are querying
+# Token is the Plex server token. This is taken from the web when you view the xml for a media item. It will be at the very end
+# Library is a the name of the library you are wishing to query the data for
 def get_library(url, token, library):
 
     from plexapi.server import PlexServer
@@ -59,7 +71,7 @@ def get_library(url, token, library):
     results = ((PlexServer(url, token)).library.section(library)).search()
 
     # If the library is TV Shows, return a list of episode objects
-    if  hasattr(results[0], 'season'):
+    if hasattr(results[0], 'season'):
         episode_list = []
         for show in results:
             for season in show.seasons():
