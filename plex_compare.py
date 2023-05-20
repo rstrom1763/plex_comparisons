@@ -8,7 +8,9 @@ def plex_compare(db1, db2, file, exclude_file=""):
     import utils
     import json
 
-    space_needed = 0
+    space_needed = 0 # Variable to hold the number of bytes difference between the two libraries
+
+    # Load the exclude file into a list and remove newline characters
     if exclude_file != "":
         exclude_file = (open(exclude_file, 'r', encoding='utf-8')).readlines()
         for line in exclude_file:
@@ -30,60 +32,24 @@ def plex_compare(db1, db2, file, exclude_file=""):
         print("Unknown data type")
         return
 
-    dict1 = {}
-    dict2 = {}
-    list = []
+    dict1 = {} # Dict that db1 will be loaded into
+    dict2 = {} # Dict that db2 will be loaded into
+    list = [] # List of media items that are found in the first db but not the second. For final output
 
-    if "Season" in db1[0] and "Season" in db2[0]:
-        media_type = "tv"
-    elif "Season" not in db1[0] and "Season" not in db2[0]:
-        media_type = "movie"
-    else:
-        print("Error: Mismatching DB Types")
-        return
+    # Load the db data into the dicts
+    # Title of the media item becomes the key
+    # The whole individual dict becomes the value
+    for dict in db1:
+        dict1[dict["Title"].lower()] = dict
+    for dict in db2:
+        dict2[dict["Title"].lower()] = dict
 
-    if media_type == "movie":
-        for dict in db1:
-            dict1[dict["Title"].lower()] = dict
-        for dict in db2:
-            dict2[dict["Title"].lower()] = dict
-        for movie in dict1:
-            if movie not in dict2 and movie not in exclude_file:
-                list.append(dict1[movie])
-    elif media_type == "tv":
-        for dict in db1:
-            if dict['Series Title'].lower() not in dict1:
-                dict1[dict["Series Title"].lower()] = {}
-                dict1[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-            elif dict['Episode Title'].lower() not in dict1[dict['Series Title'].lower()]:
-                dict1[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-
-        for dict in db2:
-            if dict['Series Title'].lower() not in dict2:
-                dict2[dict["Series Title"].lower()] = {}
-                dict2[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-            elif dict['Episode Title'].lower() not in dict2[dict['Series Title'].lower()]:
-                dict2[dict['Series Title'].lower(
-                )][dict['Episode Title'].lower()] = dict
-
-        for show in dict1.values():
-            for episode in show.values():
-                if episode['Series Title'].lower() not in dict2:
-                    list.append(episode)
-                else:
-                    found = False
-                    for show2 in dict2.values():
-                        if found == True:
-                            break
-                        for episode2 in show2.values():
-                            if episode['Episode Title'].lower() in episode2['Episode Title'].lower() and episode['Series Title'].lower() in episode2['Series Title'].lower():
-                                found = True
-                                break
-                    if found == False:
-                        list.append(episode)
+    # Perform the compare
+    # Loops through all of the media items in dict1 and adds andything not also in dict 2 to "list"
+    # Also needs to not be in the exclude file
+    for movie in dict1:
+        if movie not in dict2 and movie not in exclude_file:
+            list.append(dict1[movie])
 
 # Iterates through the dictionaries to print required file space
     for item in list:
@@ -91,15 +57,31 @@ def plex_compare(db1, db2, file, exclude_file=""):
             space_needed += int(item["FileSizeBytes"])
     print(utils.human_readable(space_needed))
 
-    utils.export_csv(list, file)
+    utils.export_csv(list, file) # Writes the resulting data to a csv file
 
-
+# Queries the Plex Server for the library data
+# Url is the dns name or the ip address of the plex server you are querying
+# Token is the Plex server token. This is taken from the web when you view the xml for a media item. It will be at the very end
+# Library is a the name of the library you are wishing to query the data for
 def get_library(url, token, library):
 
     from plexapi.server import PlexServer
 
     # print(type(test[0].locations))
-    return ((PlexServer(url, token)).library.section(library)).search()
+    results = ((PlexServer(url, token)).library.section(library)).search()
+
+    # If the library is TV Shows, return a list of episode objects
+    if hasattr(results[0], 'season'):
+        episode_list = []
+        for show in results:
+            for season in show.seasons():
+                for episode in season.episodes():
+                    episode.title = "{} : {}".format(show.title, episode.title)
+                    episode_list += episode
+        return episode_list
+
+    # Else return the movie file list
+    return results
 
 
 def transcribe_data_csv(files, out_file):
@@ -148,8 +130,7 @@ def sync_data(json, url, token):
 
     import requests
 
-    headers_dict = {"token": token,
-                    'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers_dict = {"token": token, 'Content-type': 'application/json', 'Accept': 'text/plain'}
     requests.post(url, headers=headers_dict, data=json, verify=False)
 
 
@@ -162,8 +143,7 @@ def download_diff(url, token, out_file):
 
     out_file = open(out_file, 'w', encoding='utf-8')
 
-    out_file.write(requests.get(
-        url, headers=headers_dict, verify=False).json())
+    out_file.write(requests.get(url, headers=headers_dict, verify=False).json())
 
     out_file.close()
 
@@ -175,30 +155,14 @@ def new_user(username, url, password):
     import json
 
     N = 20
-    token = ''.join(random.SystemRandom().choice(
-        string.ascii_letters + string.digits) for _ in range(N))
+    token = ''.join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(N))
 
-    headers_dict = {'Content-type': 'application/json',
-                    'Accept': 'text/plain', 'access_token': token}
+    headers_dict = {'Content-type': 'application/json', 'Accept': 'text/plain', 'access_token': token}
 
-    data_json = {'username': username,
-                 'access_token': token, 'password': password}
+    data_json = {'username': username,'access_token': token, 'password': password}
 
     data_json = json.dumps(data_json)
-    result = requests.post(url, headers=headers_dict,
-                           data=data_json, verify=False)
+    result = requests.post(url, headers=headers_dict, data=data_json, verify=False)
 
     if result.status_code != 200:
         print("Oh no")
-
-
-# Examples:
-transcribe_data_csv(get_library('http://plex:32400', '4CX8sBFPjAVSfJWohux5',
-                    "Movies"), out_file="C:/Strom/ryanlibrarytest.csv")
-
-
-'''plex_compare("C:/Strom/KentLibraryTest.csv",
-             "C:/Strom/ryanlibrarytest.csv", "C:/strom/ryan_no_have.csv")
-plex_compare("C:/Strom/ryanlibrarytest.csv",
-             "C:/Strom/kentlibraryTest.csv", "C:/strom/kent_no_have.csv")
-'''

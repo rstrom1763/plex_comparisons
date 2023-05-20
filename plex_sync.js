@@ -52,7 +52,7 @@ app.post('/newuser', (req, res) => {
 
 });
 
-var httpServer = http.createServer(app);
+var httpServer = http.createServer(app); //Appears to never be used however the whole thing doesn't work without this line
 var httpsServer = https.createServer(credentials, app);
 httpsServer.listen(port);
 console.log('Listening on port ' + port + '... ');
