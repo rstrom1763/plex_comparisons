@@ -45,7 +45,7 @@ def plex_compare(db1, db2, file, exclude_file=""):
         dict2[dict["Title"].lower()] = dict
 
     # Perform the compare
-    # Loops through all of the media items in dict1 and adds andything not also in dict 2 to "list"
+    # Loops through all of the media items in dict1 and adds anything not also in dict 2 to "list"
     # Also needs to not be in the exclude file
     for movie in dict1:
         if movie not in dict2 and movie not in exclude_file:
