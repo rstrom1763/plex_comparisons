@@ -64,6 +64,17 @@ func main() {
 
 	clear()
 
+	dataDir := "./data/"
+	//Ensure that the dataDir actually exists
+	err := os.Mkdir(dataDir, os.ModePerm)
+	if err != nil {
+		if err.Error() == "mkdir ./data/: Cannot create a file when that file already exists." || err.Error() == "mkdir ./data/: file exists" {
+			fmt.Print()
+		} else {
+			fmt.Println("Error creating folder:", err)
+		}
+	}
+
 	//Read config json contents
 	raw_conf, err := os.ReadFile("./config.json")
 	if err != nil {
@@ -130,8 +141,8 @@ func main() {
 
 	}
 
-	var show_seasons []plex.MediaContainer  //Each MediaContainer is a show
-	var show_episodes []plex.MediaContainer //Each MediaContainer is a season
+	var show_seasons []plex.MediaContainer  //Each MediaContainer is a season
+	var show_episodes []plex.MediaContainer //Each MediaContainer is an episode
 	for _, show := range final_show_library {
 
 		//With these keys, GetEpisodes actually gets the seasons
@@ -172,8 +183,8 @@ func main() {
 	postData(conf["server_url"]+"/upload/shows/seasons", compressData(seasons_json), false)
 	postData(conf["server_url"]+"/upload/shows/episodes", compressData(episodes_json), false)
 
-	os.WriteFile("./data/movies.json", movies_json, 0644)
-	os.WriteFile("./data/seasons.json", seasons_json, 0644)
-	os.WriteFile("./data/episodes.json", episodes_json, 0644)
+	os.WriteFile(dataDir+"movies.json", movies_json, 0644)
+	os.WriteFile(dataDir+"seasons.json", seasons_json, 0644)
+	os.WriteFile(dataDir+"episodes.json", episodes_json, 0644)
 
 }
