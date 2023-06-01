@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -22,6 +24,48 @@ import (
 
 func compare() {
 
+}
+
+func compressData(data []byte) []byte {
+	var compressedData bytes.Buffer
+
+	// Create a new Gzip Writer, providing the compressedData buffer
+	gzipWriter := gzip.NewWriter(&compressedData)
+
+	// Write the data to the Gzip Writer
+	_, err := gzipWriter.Write(data)
+	if err != nil {
+		return nil
+	}
+
+	// Close the Gzip Writer to flush any remaining data
+	err = gzipWriter.Close()
+	if err != nil {
+		return nil
+	}
+
+	// Return the compressed data as a byte slice
+	return compressedData.Bytes()
+}
+
+func decompressData(data []byte) []byte {
+	// Create a buffer with the data bytes
+	buf := bytes.NewReader(data)
+
+	// Create a gzip reader
+	gzipReader, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil
+	}
+	defer gzipReader.Close()
+
+	// Read the decompressed data from the gzip reader
+	decompressedData, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return nil
+	}
+
+	return decompressedData
 }
 
 func generateSSL() {
