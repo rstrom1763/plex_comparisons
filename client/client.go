@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -53,6 +54,26 @@ func compressData(data []byte) []byte {
 
 	// Return the compressed data as a byte slice
 	return compressedData.Bytes()
+}
+
+func decompressData(data []byte) []byte {
+	// Create a buffer with the data bytes
+	buf := bytes.NewReader(data)
+
+	// Create a gzip reader
+	gzipReader, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil
+	}
+	defer gzipReader.Close()
+
+	// Read the decompressed data from the gzip reader
+	decompressedData, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return nil
+	}
+
+	return decompressedData
 }
 
 func main() {
