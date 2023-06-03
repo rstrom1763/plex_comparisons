@@ -26,6 +26,12 @@ func compare() {
 
 }
 
+type User struct {
+	Firstname string
+	Lastname  string
+	Username  string
+}
+
 func compressData(data []byte) []byte {
 	var compressedData bytes.Buffer
 
@@ -118,6 +124,20 @@ func generateSSL() {
 	fmt.Println("TLS certificate and private key generated successfully.")
 }
 
+func ensureFileExists(path string) {
+
+	// Check if the file exists
+	_, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
+		file, err := os.Create(path)
+		if err != nil {
+			log.Fatalf("Could not create file %v: %v", path, err)
+		}
+		file.Close()
+	}
+}
+
 func main() {
 
 	generateSSL()
@@ -133,7 +153,22 @@ func main() {
 		}
 	}
 
+	var users map[string]User
+	userJSONFilePath := dataDir + "users.json"
+	ensureFileExists(userJSONFilePath)
+	usersJSON, err := os.ReadFile(userJSONFilePath)
+	if err != nil {
+		log.Fatalf("Could not read the user database: %v", err)
+	}
+	//Init the userJSON if the file is empty
+	if string(usersJSON) == "" {
+		users = make(map[string]User)
+	} else {
+		json.Unmarshal(usersJSON, &users)
+	}
+
 	//Read config json contents
+	ensureFileExists("./config.json")
 	raw_conf, err := os.ReadFile("./config.json")
 	if err != nil {
 		log.Fatalf("Could not read config file: %v", err)
@@ -187,6 +222,28 @@ func main() {
 		}
 
 		os.WriteFile(dataDir+"seasons.json.gz", data, 0644)
+	})
+
+	r.POST("/user/new", func(c *gin.Context) {
+		firstName := c.Request.Header.Get("firstname")
+		lastName := c.Request.Header.Get("lastname")
+		username := c.Request.Header.Get("username")
+
+		_, exists := users[username]
+		if exists {
+			c.Data(400, "text/plain", []byte("User already exists!"))
+		} else {
+			users[username] = User{firstName, lastName, username}
+
+			userDump, err := json.Marshal(users)
+			if err != nil {
+				fmt.Println("There was an error marshalling user json data")
+			}
+
+			os.WriteFile("./data/users.json", userDump, 0644)
+			c.Data(200, "text/plain", []byte("User created!"))
+		}
+
 	})
 
 	fmt.Printf("Listening on port %v...\n", conf["port"])     //Notifies that server is running on X port
