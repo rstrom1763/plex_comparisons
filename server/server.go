@@ -22,14 +22,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func compare() {
+func compare(user1 string, user2 string) {
 
 }
 
 type User struct {
-	Firstname string
-	Lastname  string
-	Username  string
+	Firstname string `json:"firstname"`
+	Lastname  string `json:"lastname"`
+	Username  string `json:"username"`
 }
 
 func compressData(data []byte) []byte {
@@ -124,6 +124,22 @@ func generateSSL() {
 	fmt.Println("TLS certificate and private key generated successfully.")
 }
 
+func ensureFolderExists(path string) error {
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Create the folder if it doesn't exist
+			err = os.MkdirAll(path, 0755)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureFileExists(path string) {
 
 	// Check if the file exists
@@ -143,15 +159,7 @@ func main() {
 	generateSSL()
 
 	dataDir := "./data/"
-	//Ensure that the dataDir actually exists
-	err := os.Mkdir(dataDir, os.ModePerm)
-	if err != nil {
-		if err.Error() == "mkdir ./data/: Cannot create a file when that file already exists." || err.Error() == "mkdir ./data/: file exists" {
-			fmt.Print()
-		} else {
-			fmt.Println("Error creating folder:", err)
-		}
-	}
+	ensureFolderExists(dataDir)
 
 	var users map[string]User
 	userJSONFilePath := dataDir + "users.json"
@@ -197,31 +205,41 @@ func main() {
 
 	r.POST("/upload/movies", func(c *gin.Context) {
 
-		data, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			log.Fatalf("Could not read request body: %v", err)
-		}
+		username := c.Request.Header.Get("username")
 
-		os.WriteFile(dataDir+"movies.json.gz", data, 0644)
+		_, exists := users[username]
+		if exists {
+			data, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				log.Fatalf("Could not read request body: %v", err)
+			}
+			ensureFolderExists(dataDir + "dumps/" + username)
+			filename := fmt.Sprintf("%v/dumps/%v/movies.json.gz", dataDir, username)
+			os.WriteFile(filename, data, 0644)
+			c.Data(200, "text/plain", []byte("Success"))
+		} else {
+			c.Data(404, "text/plain", []byte("User not found"))
+		}
 
 	})
 
-	r.POST("/upload/shows/episodes", func(c *gin.Context) {
-		data, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			log.Fatalf("Could not read request body: %v", err)
+	r.POST("/upload/shows", func(c *gin.Context) {
+
+		username := c.Request.Header.Get("username")
+
+		_, exists := users[username]
+		if exists {
+			data, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				log.Fatalf("Could not read request body: %v", err)
+			}
+			ensureFolderExists(dataDir + "dumps/" + username)
+			filename := fmt.Sprintf("%vdumps/%v/episodes.json.gz", dataDir, username)
+			os.WriteFile(filename, data, 0644)
+		} else {
+			c.Data(404, "text/plain", []byte("User not found"))
 		}
 
-		os.WriteFile(dataDir+"episodes.json.gz", data, 0644)
-	})
-
-	r.POST("/upload/shows/seasons", func(c *gin.Context) {
-		data, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			log.Fatalf("Could not read request body: %v", err)
-		}
-
-		os.WriteFile(dataDir+"seasons.json.gz", data, 0644)
 	})
 
 	r.POST("/user/new", func(c *gin.Context) {

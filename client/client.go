@@ -22,15 +22,28 @@ func clear() {
 	c.Run()
 }
 
-func postData(serverUrl string, data []byte, validate_ssl bool) {
+func postData(serverUrl string, data []byte, username string, validate_ssl bool) {
 	if !validate_ssl {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
+
 	r := bytes.NewReader(data)
-	_, err := http.Post(serverUrl, "application/json", r)
+	req, err := http.NewRequest("POST", serverUrl, r)
+	if err != nil {
+		fmt.Printf("Could not create request: %v\n", err)
+		return
+	}
+
+	// Set the desired header
+	req.Header.Set("username", username)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("Could not post to the server: %v\n", err)
+		return
 	}
+	defer resp.Body.Close()
 
 }
 
@@ -200,9 +213,8 @@ func main() {
 	}
 
 	//Post the data to the server
-	postData(conf["server_url"]+"/upload/movies", compressData(movies_json), false)
-	postData(conf["server_url"]+"/upload/shows/seasons", compressData(seasons_json), false)
-	postData(conf["server_url"]+"/upload/shows/episodes", compressData(episodes_json), false)
+	postData(conf["server_url"]+"/upload/movies", compressData(movies_json), conf["username"], false)
+	postData(conf["server_url"]+"/upload/shows", compressData(episodes_json), conf["username"], false)
 
 	os.WriteFile(dataDir+"movies.json", movies_json, 0644)
 	os.WriteFile(dataDir+"seasons.json", seasons_json, 0644)
