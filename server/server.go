@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
@@ -20,16 +21,106 @@ import (
 
 	nocache "github.com/alexander-melentyev/gin-nocache"
 	"github.com/gin-gonic/gin"
+	"github.com/jrudio/go-plex-client"
 )
 
-func compare(user1 string, user2 string) {
+func returnErr(c *gin.Context, statusCode int, err error) {
+	c.Data(statusCode, "text/plain", []byte(err.Error()))
+}
 
+func initMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
+
+	for _, movie := range *userObjects {
+		newMovie := Movie{movie}
+		_, exists := userMap[newMovie.getTitle()]
+
+		if exists {
+			fmt.Println("Movie with Duplicate name: " + movie.Title)
+		} else {
+			userMap[newMovie.getTitle()] = newMovie
+		}
+
+	}
+}
+
+// Find all items in movieMap1 that are not in movieMap2
+func findNotIn(userObjects []plex.Metadata, moviesMap2 map[string]Movie) []Movie {
+	var notIn []Movie
+
+	for _, movie := range userObjects {
+		movieObject := Movie{movie}
+		_, exists := moviesMap2[movieObject.getTitle()]
+
+		if !exists {
+			notIn = append(notIn, movieObject)
+		}
+	}
+
+	return notIn
+
+}
+
+func extractMetadata(movies []Movie) []plex.Metadata {
+	var output []plex.Metadata
+	for _, movie := range movies {
+		output = append(output, movie.getMetadata())
+	}
+	return output
+}
+
+func compareMovies(user1Data []byte, user2Data []byte) string {
+
+	var user1Objects []plex.Metadata
+	var user2Objects []plex.Metadata
+	//var user1Movies []Movie
+	//var user2Movies []Movie
+	//var user1Map map[string]Movie
+	//var user2Map map[string]Movie
+	//var diff []Movie
+	//var json_string_diff string
+	user1Map := make(map[string]Movie)
+	user2Map := make(map[string]Movie)
+
+	err := json.Unmarshal(user1Data, &user1Objects)
+	if err != nil {
+		log.Fatalf("Could not unmarshal JSON: %v", err)
+	}
+	err = json.Unmarshal(user2Data, &user2Objects)
+	if err != nil {
+		log.Fatalf("Could not unmarshal JSON: %v", err)
+	}
+
+	initMap(&user1Objects, user1Map)
+	initMap(&user2Objects, user2Map)
+
+	diff := findNotIn(user1Objects, user2Map)
+	output, err := json.Marshal(extractMetadata(diff))
+	if err != nil {
+		log.Fatalf("Could not marshal JSON: %v", err)
+	}
+	return string(output)
 }
 
 type User struct {
 	Firstname string `json:"firstname"`
 	Lastname  string `json:"lastname"`
 	Username  string `json:"username"`
+}
+
+type Movie struct {
+	MetaDataObject plex.Metadata
+}
+
+func (m Movie) getTitle() string {
+	return m.MetaDataObject.Title
+}
+
+func (m Movie) getYear() int {
+	return m.MetaDataObject.Year
+}
+
+func (m Movie) getMetadata() plex.Metadata {
+	return m.MetaDataObject
 }
 
 func compressData(data []byte) []byte {
@@ -154,9 +245,83 @@ func ensureFileExists(path string) {
 	}
 }
 
+func createTarArchive(file1Data []byte, file1Name string, file2Data []byte, file2Name string) ([]byte, error) {
+	// Create a buffer to hold the tar archive
+	var buf bytes.Buffer
+
+	// Create a tar writer
+	tarWriter := tar.NewWriter(&buf)
+	defer tarWriter.Close()
+
+	// Create file 1 in the tar archive
+	file1Header := &tar.Header{
+		Name: file1Name,
+		Mode: 0644, // Set appropriate file permissions
+		Size: int64(len(file1Data)),
+	}
+	if err := tarWriter.WriteHeader(file1Header); err != nil {
+		return nil, fmt.Errorf("failed to write tar header for file 1: %w", err)
+	}
+	if _, err := tarWriter.Write(file1Data); err != nil {
+		return nil, fmt.Errorf("failed to write file 1 data to tar archive: %w", err)
+	}
+
+	// Create file 2 in the tar archive
+	file2Header := &tar.Header{
+		Name: file2Name,
+		Mode: 0644, // Set appropriate file permissions
+		Size: int64(len(file2Data)),
+	}
+	if err := tarWriter.WriteHeader(file2Header); err != nil {
+		return nil, fmt.Errorf("failed to write tar header for file 2: %w", err)
+	}
+	if _, err := tarWriter.Write(file2Data); err != nil {
+		return nil, fmt.Errorf("failed to write file 2 data to tar archive: %w", err)
+	}
+
+	// Close the tar writer to flush any remaining data
+	if err := tarWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close tar writer: %w", err)
+	}
+
+	// Return the tar archive data as a []byte
+	return buf.Bytes(), nil
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if err == nil {
+		return true // File exists
+	}
+	if os.IsNotExist(err) {
+		return false // File does not exist
+	}
+	return false // Error occurred (e.g., permission denied)
+}
+
+func sendAsFile(c *gin.Context, data []byte, filename string) {
+
+	err := os.WriteFile("./"+filename, data, 0644)
+	if err != nil {
+		log.Fatalf("Could not write file: %v", err)
+	}
+	defer os.Remove("./" + filename)
+
+	// Set the appropriate headers for the download
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Content-Type", "text/plain")
+	c.Header("Content-Length", string(len(data)))
+
+	// Write the text content as the response body
+	c.File("./" + filename)
+
+}
+
 func main() {
 
-	generateSSL()
+	if !(fileExists("./cert.pem") && fileExists("./private.key")) {
+		generateSSL()
+	}
 
 	dataDir := "./data/"
 	ensureFolderExists(dataDir)
@@ -261,6 +426,34 @@ func main() {
 			os.WriteFile("./data/users.json", userDump, 0644)
 			c.Data(200, "text/plain", []byte("User created!"))
 		}
+
+	})
+
+	r.GET("/compare/:user1/:user2", func(c *gin.Context) {
+		user1 := c.Param("user1")
+		user2 := c.Param("user2")
+
+		user1Dump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/movies.json.gz")
+		if err != nil {
+			log.Fatalf("Could not read file: %v", err)
+		}
+		user2Dump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/movies.json.gz")
+		if err != nil {
+			log.Fatalf("Could not read file: %v", err)
+		}
+
+		diff1 := compareMovies(decompressData(user1Dump), decompressData(user2Dump))
+		diff2 := compareMovies(decompressData(user2Dump), decompressData(user1Dump))
+
+		diff1Name := user2 + "_no_have.json"
+		diff2Name := user1 + "_no_have.json"
+
+		diffArchive, err := createTarArchive([]byte(diff1), diff1Name, []byte(diff2), diff2Name)
+		if err != nil {
+			log.Fatalf("Could not create Tar archive: %v", err)
+		}
+
+		sendAsFile(c, compressData(diffArchive), "archive.tar.gz")
 
 	})
 
