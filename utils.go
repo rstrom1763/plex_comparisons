@@ -72,7 +72,7 @@ func generateSSL() {
 	// Generate a private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		fmt.Println("Error generating private key:", err)
+		log.Fatal("Error generating private key:", err)
 		return
 	}
 
@@ -91,14 +91,14 @@ func generateSSL() {
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		fmt.Println("Error creating certificate:", err)
+		log.Fatal("Error creating certificate:", err)
 		return
 	}
 
 	// Write the private key and certificate to files
 	keyOut, err := os.Create("./private.key")
 	if err != nil {
-		fmt.Println("Error creating private key file:", err)
+		log.Fatal("Error creating private key file:", err)
 		return
 	}
 	defer keyOut.Close()
@@ -107,7 +107,7 @@ func generateSSL() {
 
 	certOut, err := os.Create("./cert.pem")
 	if err != nil {
-		fmt.Println("Error creating certificate file:", err)
+		log.Fatal("Error creating certificate file:", err)
 		return
 	}
 	defer certOut.Close()
@@ -265,7 +265,7 @@ func initMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
 		_, exists := userMap[newMovie.getTitle()]
 
 		if exists {
-			fmt.Println("Movie with Duplicate name: " + movie.Title)
+			log.Println("Movie with Duplicate name: " + movie.Title)
 		} else {
 			userMap[newMovie.getTitle()] = newMovie
 		}

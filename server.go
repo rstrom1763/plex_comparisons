@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -173,6 +174,9 @@ func runServer(conf map[string]string) {
 		user1 := c.Param("user1")
 		user2 := c.Param("user2")
 
+		var logOutput bytes.Buffer
+		log.SetOutput(&logOutput)
+
 		user1Dump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/movies.json.gz")
 		if err != nil {
 			log.Fatalf("Could not read file: %v", err)
@@ -192,6 +196,7 @@ func runServer(conf map[string]string) {
 		var outputFiles []File                                                        //Holds the file objects
 		outputFiles = append(outputFiles, File{Data: []byte(diff1), Name: diff1Name}) //Append diff1
 		outputFiles = append(outputFiles, File{Data: []byte(diff2), Name: diff2Name}) //Apped diff2
+		outputFiles = append(outputFiles, File{Data: logOutput.Bytes(), Name: "compare.log"})
 
 		diffArchive, err := createTarArchive(outputFiles)
 		if err != nil {
