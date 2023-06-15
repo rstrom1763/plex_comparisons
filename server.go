@@ -188,7 +188,12 @@ func runServer(conf map[string]string) {
 		diff1Name := user2 + "_no_have.json"
 		diff2Name := user1 + "_no_have.json"
 
-		diffArchive, err := createTarArchive([]byte(diff1), diff1Name, []byte(diff2), diff2Name)
+		//Add files to File struct list. This will be fed into createTarArchive
+		var outputFiles []File                                                        //Holds the file objects
+		outputFiles = append(outputFiles, File{Data: []byte(diff1), Name: diff1Name}) //Append diff1
+		outputFiles = append(outputFiles, File{Data: []byte(diff2), Name: diff2Name}) //Apped diff2
+
+		diffArchive, err := createTarArchive(outputFiles)
 		if err != nil {
 			log.Fatalf("Could not create Tar archive: %v", err)
 		}

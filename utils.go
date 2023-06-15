@@ -131,7 +131,7 @@ func ensureFileExists(path string) {
 	}
 }
 
-func createTarArchive(file1Data []byte, file1Name string, file2Data []byte, file2Name string) ([]byte, error) {
+func createTarArchive(files []File) ([]byte, error) {
 	// Create a buffer to hold the tar archive
 	var buf bytes.Buffer
 
@@ -139,30 +139,18 @@ func createTarArchive(file1Data []byte, file1Name string, file2Data []byte, file
 	tarWriter := tar.NewWriter(&buf)
 	defer tarWriter.Close()
 
-	// Create file 1 in the tar archive
-	file1Header := &tar.Header{
-		Name: file1Name,
-		Mode: 0644, // Set appropriate file permissions
-		Size: int64(len(file1Data)),
-	}
-	if err := tarWriter.WriteHeader(file1Header); err != nil {
-		return nil, fmt.Errorf("failed to write tar header for file 1: %w", err)
-	}
-	if _, err := tarWriter.Write(file1Data); err != nil {
-		return nil, fmt.Errorf("failed to write file 1 data to tar archive: %w", err)
-	}
-
-	// Create file 2 in the tar archive
-	file2Header := &tar.Header{
-		Name: file2Name,
-		Mode: 0644, // Set appropriate file permissions
-		Size: int64(len(file2Data)),
-	}
-	if err := tarWriter.WriteHeader(file2Header); err != nil {
-		return nil, fmt.Errorf("failed to write tar header for file 2: %w", err)
-	}
-	if _, err := tarWriter.Write(file2Data); err != nil {
-		return nil, fmt.Errorf("failed to write file 2 data to tar archive: %w", err)
+	for _, file := range files {
+		fileHeader := &tar.Header{
+			Name: file.Name,
+			Mode: 0644, // Set appropriate file permissions
+			Size: int64(len(file.Data)),
+		}
+		if err := tarWriter.WriteHeader(fileHeader); err != nil {
+			return nil, fmt.Errorf("failed to write tar header for file %v: %w", file.Name, err)
+		}
+		if _, err := tarWriter.Write(file.Data); err != nil {
+			return nil, fmt.Errorf("failed to write %v data to tar archive: %w", file.Name, err)
+		}
 	}
 
 	// Close the tar writer to flush any remaining data
