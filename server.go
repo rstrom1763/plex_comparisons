@@ -203,7 +203,7 @@ func runServer(conf map[string]string) {
 			log.Fatalf("Could not create Tar archive: %v", err)
 		}
 
-		sendAsFile(c, compressData(diffArchive), "archive.tar.gz")
+		sendAsFile(c, File{Name: "archive.tar.gz", Data: compressData(diffArchive)})
 
 	})
 

@@ -180,7 +180,10 @@ func clear() {
 	c.Run()
 }
 
-func sendAsFile(c *gin.Context, data []byte, filename string) {
+func sendAsFile(c *gin.Context, file File) {
+
+	filename := file.Name
+	data := file.Data
 
 	err := os.WriteFile("./"+filename, data, 0644)
 	if err != nil {
@@ -271,4 +274,5 @@ func initMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
 		}
 
 	}
+
 }
