@@ -199,6 +199,7 @@ func sendAsFile(c *gin.Context, file File) {
 	// Write the text content as the response body
 	c.File("./" + filename)
 }
+
 func postData(serverUrl string, data []byte, username string, validate_ssl bool) {
 	if !validate_ssl {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -236,6 +237,7 @@ func ensureFolderExists(path string) error {
 		} else {
 			return err
 		}
+
 	}
 	return nil
 }
