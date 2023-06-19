@@ -43,12 +43,6 @@ func compareMovies(user1Data []byte, user2Data []byte) string {
 
 	var user1Objects []plex.Metadata
 	var user2Objects []plex.Metadata
-	//var user1Movies []Movie
-	//var user2Movies []Movie
-	//var user1Map map[string]Movie
-	//var user2Map map[string]Movie
-	//var diff []Movie
-	//var json_string_diff string
 	user1Map := make(map[string]Movie)
 	user2Map := make(map[string]Movie)
 
