@@ -263,7 +263,7 @@ func returnErr(c *gin.Context, statusCode int, err error) {
 	c.Data(statusCode, "text/plain", []byte(err.Error()))
 }
 
-func initMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
+func initMoviesMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
 
 	for _, movie := range *userObjects {
 		newMovie := Movie{movie}
@@ -277,4 +277,55 @@ func initMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
 
 	}
 
+}
+
+func initShowsMap(userObjects *[]plex.Metadata, userMap map[string]Show) {
+
+	for _, show := range *userObjects {
+		newShow := Show{MetaDataObject: show, Seasons: make(map[int]Season)}
+		_, exists := userMap[newShow.getTitle()]
+
+		if exists {
+			log.Println("Show with Duplicate name: " + show.Title)
+		} else {
+			userMap[newShow.getTitle()] = newShow
+		}
+
+	}
+
+}
+
+func initSeasons(seasons *[]plex.Metadata, showMap map[string]Show) {
+
+	for _, season := range *seasons {
+		newSeason := Season{MetaDataObject: season, Episodes: make(map[int]Episode)}
+		show, exists := showMap[newSeason.getShowTitle()]
+
+		if exists {
+			show.addSeason(newSeason)
+			fmt.Println(newSeason.getShowTitle())
+		} else {
+			fmt.Println(newSeason.getShowTitle())
+			log.Printf("Missing Show: %v", newSeason.getShowTitle())
+		}
+
+	}
+
+}
+
+func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
+
+	for _, episode := range *episodes {
+		fmt.Println(episode)
+		newEpisode := Episode{MetaDataObject: episode}
+		show, exists := showMap[newEpisode.getShowTitle()]
+
+		if exists {
+			season := show.getSeason(newEpisode.getSeasonNumber())
+			season.addEpisode(newEpisode)
+		} else {
+			log.Printf("Missing Show: %v", newEpisode.getShowTitle())
+		}
+
+	}
 }

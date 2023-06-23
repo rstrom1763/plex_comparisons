@@ -78,6 +78,7 @@ func runService(conf map[string]string) {
 
 	}
 
+	var show_seasons []plex.MediaContainer  //Each MediaContainer is a season
 	var show_episodes []plex.MediaContainer //Each MediaContainer is an episode
 	for _, show := range final_show_library {
 
@@ -87,6 +88,7 @@ func runService(conf map[string]string) {
 		if err != nil {
 			log.Fatalf("Could not get show season data: %v", err)
 		}
+		show_seasons = append(show_seasons, season_data.MediaContainer)
 
 		for _, season := range season_data.MediaContainer.Metadata {
 			episode_data, err := plexClient.GetEpisodes(season.RatingKey)
@@ -103,6 +105,16 @@ func runService(conf map[string]string) {
 		log.Fatalf("Could not marshal json: %v", err)
 	}
 
+	shows_json, err := json.Marshal(final_show_library)
+	if err != nil {
+		log.Fatalf("Could not marshal json: %v", err)
+	}
+
+	seasons_json, err := json.Marshal(show_seasons)
+	if err != nil {
+		log.Fatalf("Could not marshal json: %v", err)
+	}
+
 	episodes_json, err := json.Marshal(show_episodes)
 	if err != nil {
 		log.Fatalf("Could not marshal json: %v", err)
@@ -110,9 +122,13 @@ func runService(conf map[string]string) {
 
 	//Post the data to the server
 	postData(conf["server_url"]+"/upload/movies", compressData(movies_json), conf["username"], false)
-	postData(conf["server_url"]+"/upload/shows", compressData(episodes_json), conf["username"], false)
+	postData(conf["server_url"]+"/upload/seasons", compressData(seasons_json), conf["username"], false)
+	postData(conf["server_url"]+"/upload/shows", compressData(shows_json), conf["username"], false)
+	postData(conf["server_url"]+"/upload/episodes", compressData(episodes_json), conf["username"], false)
 
 	os.WriteFile(dataDir+"local_dumps/movies.json.gz", compressData(movies_json), 0644)
+	os.WriteFile(dataDir+"local_dumps/seasons.json.gz", compressData(seasons_json), 0644)
 	os.WriteFile(dataDir+"local_dumps/episodes.json.gz", compressData(episodes_json), 0644)
+	os.WriteFile(dataDir+"local_dumps/shows.json.gz", compressData(shows_json), 0644)
 
 }

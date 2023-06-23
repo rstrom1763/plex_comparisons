@@ -31,6 +31,37 @@ func findNotIn(userObjects []plex.Metadata, moviesMap2 map[string]Movie) []Movie
 
 }
 
+func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesDump []byte, user2ShowsDump []byte, user2SeasonsDump []byte, user2EpisodesDump []byte) string {
+
+	user1Shows := make(map[string]Show)
+	user2Shows := make(map[string]Show)
+
+	var user1ShowsMetadata []plex.Metadata
+	var user1SeasonsMetadata []plex.Metadata
+	var user1EpisodesMetadata []plex.Metadata
+	var user2ShowsMetadata []plex.Metadata
+	var user2SeasonsMetadata []plex.Metadata
+	var user2EpisodesMetadata []plex.Metadata
+
+	json.Unmarshal(user1ShowsDump, &user1ShowsMetadata)
+	json.Unmarshal(user1SeasonsDump, &user1SeasonsMetadata)
+	json.Unmarshal(user1EpisodesDump, &user1EpisodesMetadata)
+	json.Unmarshal(user2ShowsDump, &user2ShowsMetadata)
+	json.Unmarshal(user2SeasonsDump, &user2SeasonsMetadata)
+	json.Unmarshal(user2EpisodesDump, &user2EpisodesMetadata)
+
+	initShowsMap(&user1ShowsMetadata, user1Shows)
+	initShowsMap(&user2ShowsMetadata, user2Shows)
+
+	initSeasons(&user1SeasonsMetadata, user1Shows)
+	initSeasons(&user2SeasonsMetadata, user2Shows)
+
+	initEpisodes(&user1EpisodesMetadata, user1Shows)
+	initEpisodes(&user1EpisodesMetadata, user2Shows)
+
+	return "test" //Temporary
+}
+
 func extractMetadata(movies []Movie) []plex.Metadata {
 	var output []plex.Metadata
 	for _, movie := range movies {
@@ -55,8 +86,8 @@ func compareMovies(user1Data []byte, user2Data []byte) string {
 		log.Fatalf("Could not unmarshal JSON: %v", err)
 	}
 
-	initMap(&user1Objects, user1Map)
-	initMap(&user2Objects, user2Map)
+	initMoviesMap(&user1Objects, user1Map)
+	initMoviesMap(&user2Objects, user2Map)
 
 	diff := findNotIn(user1Objects, user2Map)
 	output, err := json.Marshal(extractMetadata(diff))
@@ -123,7 +154,27 @@ func runServer(conf map[string]string) {
 
 	})
 
-	r.POST("/upload/shows", func(c *gin.Context) {
+	r.POST("/upload/seasons", func(c *gin.Context) {
+
+		username := c.Request.Header.Get("username")
+
+		_, exists := users[username]
+		if exists {
+			data, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				log.Fatalf("Could not read request body: %v", err)
+			}
+			ensureFolderExists(dataDir + "dumps/" + username)
+			filename := fmt.Sprintf("%v/dumps/%v/seasons.json.gz", dataDir, username)
+			os.WriteFile(filename, data, 0644)
+			c.Data(200, "text/plain", []byte("Success"))
+		} else {
+			c.Data(404, "text/plain", []byte("User not found"))
+		}
+
+	})
+
+	r.POST("/upload/episodes", func(c *gin.Context) {
 
 		username := c.Request.Header.Get("username")
 
@@ -135,6 +186,25 @@ func runServer(conf map[string]string) {
 			}
 			ensureFolderExists(dataDir + "dumps/" + username)
 			filename := fmt.Sprintf("%vdumps/%v/episodes.json.gz", dataDir, username)
+			os.WriteFile(filename, data, 0644)
+		} else {
+			c.Data(404, "text/plain", []byte("User not found"))
+		}
+
+	})
+
+	r.POST("/upload/shows", func(c *gin.Context) {
+
+		username := c.Request.Header.Get("username")
+
+		_, exists := users[username]
+		if exists {
+			data, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				log.Fatalf("Could not read request body: %v", err)
+			}
+			ensureFolderExists(dataDir + "dumps/" + username)
+			filename := fmt.Sprintf("%vdumps/%v/shows.json.gz", dataDir, username)
 			os.WriteFile(filename, data, 0644)
 		} else {
 			c.Data(404, "text/plain", []byte("User not found"))
@@ -171,25 +241,70 @@ func runServer(conf map[string]string) {
 		var logOutput bytes.Buffer
 		log.SetOutput(&logOutput)
 
-		user1Dump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/movies.json.gz")
+		fmt.Println("test")
+
+		user1MovieDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/movies.json.gz")
 		if err != nil {
 			log.Fatalf("Could not read file: %v", err)
 		}
-		user2Dump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/movies.json.gz")
+		user2MovieDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/movies.json.gz")
 		if err != nil {
 			log.Fatalf("Could not read file: %v", err)
 		}
+		fmt.Println("read in movies")
 
-		diff1 := compareMovies(decompressData(user1Dump), decompressData(user2Dump))
-		diff2 := compareMovies(decompressData(user2Dump), decompressData(user1Dump))
+		user1ShowDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/shows.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		user2ShowDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/shows.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		fmt.Println("read in shows")
 
-		diff1Name := user2 + "_no_have.json"
-		diff2Name := user1 + "_no_have.json"
+		user1SeasonDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/seasons.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		user2SeasonDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/seasons.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		fmt.Println("read in season")
+
+		user1EpisodeDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/episodes.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		user2EpisodeDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/episodes.json.gz")
+		if err != nil {
+			fmt.Println(err)
+			log.Fatalf("Could not read file: %v", err)
+		}
+		fmt.Println("read in episodes")
+
+		movieDiff1 := compareMovies(decompressData(user1MovieDump), decompressData(user2MovieDump))
+		movieDiff2 := compareMovies(decompressData(user2MovieDump), decompressData(user1MovieDump))
+		showsDiff1 := compareShows(decompressData(user1ShowDump), decompressData(user1SeasonDump), decompressData(user1EpisodeDump), decompressData(user2ShowDump), decompressData(user2SeasonDump), decompressData(user2EpisodeDump))
+		showsDiff2 := compareShows(decompressData(user2ShowDump), decompressData(user2SeasonDump), decompressData(user2EpisodeDump), decompressData(user1ShowDump), decompressData(user1SeasonDump), decompressData(user1EpisodeDump))
+
+		movieDiff1Name := user2 + "_no_have_movies.json"
+		movieDiff2Name := user1 + "_no_have_movies.json"
+		showDiff1Name := user1 + "_no_have_shows.json"
+		showDiff2Name := user2 + "_no_have_shows.json"
 
 		//Add files to File struct list. This will be fed into createTarArchive
-		var outputFiles []File                                                        //Holds the file objects
-		outputFiles = append(outputFiles, File{Data: []byte(diff1), Name: diff1Name}) //Append diff1
-		outputFiles = append(outputFiles, File{Data: []byte(diff2), Name: diff2Name}) //Apped diff2
+		var outputFiles []File                                                                  //Holds the file objects
+		outputFiles = append(outputFiles, File{Data: []byte(movieDiff1), Name: movieDiff1Name}) //Append diff1
+		outputFiles = append(outputFiles, File{Data: []byte(movieDiff2), Name: movieDiff2Name}) //Append diff2
+		outputFiles = append(outputFiles, File{Data: []byte(showsDiff1), Name: showDiff1Name})
+		outputFiles = append(outputFiles, File{Data: []byte(showsDiff2), Name: showDiff2Name})
 		outputFiles = append(outputFiles, File{Data: logOutput.Bytes(), Name: "compare.log"})
 
 		diffArchive, err := createTarArchive(outputFiles)
