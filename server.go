@@ -43,12 +43,30 @@ func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesD
 	var user2SeasonsMetadata []plex.Metadata
 	var user2EpisodesMetadata []plex.Metadata
 
-	json.Unmarshal(user1ShowsDump, &user1ShowsMetadata)
-	json.Unmarshal(user1SeasonsDump, &user1SeasonsMetadata)
-	json.Unmarshal(user1EpisodesDump, &user1EpisodesMetadata)
-	json.Unmarshal(user2ShowsDump, &user2ShowsMetadata)
-	json.Unmarshal(user2SeasonsDump, &user2SeasonsMetadata)
-	json.Unmarshal(user2EpisodesDump, &user2EpisodesMetadata)
+	err := json.Unmarshal(user1ShowsDump, &user1ShowsMetadata)
+	if err != nil {
+		log.Println(err)
+	}
+	err = json.Unmarshal(user1SeasonsDump, &user1SeasonsMetadata)
+	if err != nil {
+		log.Println(err)
+	}
+	err = json.Unmarshal(user1EpisodesDump, &user1EpisodesMetadata)
+	if err != nil {
+		log.Println(err)
+	}
+	err = json.Unmarshal(user2ShowsDump, &user2ShowsMetadata)
+	if err != nil {
+		log.Println(err)
+	}
+	err = json.Unmarshal(user2SeasonsDump, &user2SeasonsMetadata)
+	if err != nil {
+		log.Println(err)
+	}
+	err = json.Unmarshal(user2EpisodesDump, &user2EpisodesMetadata)
+	if err != nil {
+		log.Println(err)
+	}
 
 	initShowsMap(&user1ShowsMetadata, user1Shows)
 	initShowsMap(&user2ShowsMetadata, user2Shows)
@@ -57,8 +75,9 @@ func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesD
 	initSeasons(&user2SeasonsMetadata, user2Shows)
 
 	initEpisodes(&user1EpisodesMetadata, user1Shows)
-	initEpisodes(&user1EpisodesMetadata, user2Shows)
+	initEpisodes(&user2EpisodesMetadata, user2Shows)
 
+	//Implement compare logic here
 	return "test" //Temporary
 }
 
@@ -241,8 +260,6 @@ func runServer(conf map[string]string) {
 		var logOutput bytes.Buffer
 		log.SetOutput(&logOutput)
 
-		fmt.Println("test")
-
 		user1MovieDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/movies.json.gz")
 		if err != nil {
 			log.Fatalf("Could not read file: %v", err)
@@ -265,24 +282,24 @@ func runServer(conf map[string]string) {
 		}
 		fmt.Println("read in shows")
 
-		user1SeasonDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/seasons.json.gz")
+		user1SeasonsDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/seasons.json.gz")
 		if err != nil {
 			fmt.Println(err)
 			log.Fatalf("Could not read file: %v", err)
 		}
-		user2SeasonDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/seasons.json.gz")
+		user2SeasonsDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/seasons.json.gz")
 		if err != nil {
 			fmt.Println(err)
 			log.Fatalf("Could not read file: %v", err)
 		}
 		fmt.Println("read in season")
 
-		user1EpisodeDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/episodes.json.gz")
+		user1EpisodesDump, err := os.ReadFile(dataDir + "dumps/" + user1 + "/episodes.json.gz")
 		if err != nil {
 			fmt.Println(err)
 			log.Fatalf("Could not read file: %v", err)
 		}
-		user2EpisodeDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/episodes.json.gz")
+		user2EpisodesDump, err := os.ReadFile(dataDir + "dumps/" + user2 + "/episodes.json.gz")
 		if err != nil {
 			fmt.Println(err)
 			log.Fatalf("Could not read file: %v", err)
@@ -291,8 +308,8 @@ func runServer(conf map[string]string) {
 
 		movieDiff1 := compareMovies(decompressData(user1MovieDump), decompressData(user2MovieDump))
 		movieDiff2 := compareMovies(decompressData(user2MovieDump), decompressData(user1MovieDump))
-		showsDiff1 := compareShows(decompressData(user1ShowDump), decompressData(user1SeasonDump), decompressData(user1EpisodeDump), decompressData(user2ShowDump), decompressData(user2SeasonDump), decompressData(user2EpisodeDump))
-		showsDiff2 := compareShows(decompressData(user2ShowDump), decompressData(user2SeasonDump), decompressData(user2EpisodeDump), decompressData(user1ShowDump), decompressData(user1SeasonDump), decompressData(user1EpisodeDump))
+		showsDiff1 := compareShows(decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump), decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump))
+		showsDiff2 := compareShows(decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump), decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump))
 
 		movieDiff1Name := user2 + "_no_have_movies.json"
 		movieDiff2Name := user1 + "_no_have_movies.json"

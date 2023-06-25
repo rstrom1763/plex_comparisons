@@ -303,10 +303,8 @@ func initSeasons(seasons *[]plex.Metadata, showMap map[string]Show) {
 
 		if exists {
 			show.addSeason(newSeason)
-			fmt.Println(newSeason.getShowTitle())
 		} else {
-			fmt.Println(newSeason.getShowTitle())
-			log.Printf("Missing Show: %v", newSeason.getShowTitle())
+			log.Printf("Missing Show(Season): %v", newSeason.getShowTitle())
 		}
 
 	}
@@ -316,7 +314,6 @@ func initSeasons(seasons *[]plex.Metadata, showMap map[string]Show) {
 func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
 
 	for _, episode := range *episodes {
-		fmt.Println(episode)
 		newEpisode := Episode{MetaDataObject: episode}
 		show, exists := showMap[newEpisode.getShowTitle()]
 
@@ -324,8 +321,9 @@ func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
 			season := show.getSeason(newEpisode.getSeasonNumber())
 			season.addEpisode(newEpisode)
 		} else {
-			log.Printf("Missing Show: %v", newEpisode.getShowTitle())
+			log.Printf("Missing Show(Episode): %v", newEpisode.getShowTitle())
 		}
 
 	}
+
 }

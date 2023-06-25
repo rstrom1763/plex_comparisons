@@ -20,5 +20,5 @@ func (s *Season) getSeasonNumber() int {
 }
 
 func (s *Season) addEpisode(episode Episode) {
-	s.Episodes[episode.getEpisodeNumber()] = episode
+	s.Episodes[int(episode.getEpisodeNumber())] = episode
 }

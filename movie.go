@@ -8,14 +8,14 @@ type Movie struct {
 	MetaDataObject plex.Metadata
 }
 
-func (m Movie) getTitle() string {
+func (m *Movie) getTitle() string {
 	return m.MetaDataObject.Title
 }
 
-func (m Movie) getYear() int {
+func (m *Movie) getYear() int {
 	return m.MetaDataObject.Year
 }
 
-func (m Movie) getMetadata() plex.Metadata {
+func (m *Movie) getMetadata() plex.Metadata {
 	return m.MetaDataObject
 }

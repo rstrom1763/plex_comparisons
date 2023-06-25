@@ -78,8 +78,8 @@ func runService(conf map[string]string) {
 
 	}
 
-	var show_seasons []plex.MediaContainer  //Each MediaContainer is a season
-	var show_episodes []plex.MediaContainer //Each MediaContainer is an episode
+	var show_seasons []plex.Metadata  //Each MediaContainer is a season
+	var show_episodes []plex.Metadata //Each MediaContainer is an episode
 	for _, show := range final_show_library {
 
 		//With these keys, GetEpisodes actually gets the seasons
@@ -88,14 +88,14 @@ func runService(conf map[string]string) {
 		if err != nil {
 			log.Fatalf("Could not get show season data: %v", err)
 		}
-		show_seasons = append(show_seasons, season_data.MediaContainer)
+		show_seasons = append(show_seasons, season_data.MediaContainer.Metadata...)
 
 		for _, season := range season_data.MediaContainer.Metadata {
 			episode_data, err := plexClient.GetEpisodes(season.RatingKey)
 			if err != nil {
 				log.Fatalf("Could not get episode data: %v", err)
 			}
-			show_episodes = append(show_episodes, episode_data.MediaContainer)
+			show_episodes = append(show_episodes, episode_data.MediaContainer.Metadata...)
 		}
 
 	}

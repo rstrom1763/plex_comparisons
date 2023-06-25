@@ -6,18 +6,18 @@ type Episode struct {
 	MetaDataObject plex.Metadata
 }
 
-func (s *Episode) getShowTitle() string {
-	return s.MetaDataObject.GrandparentTitle
+func (e *Episode) getShowTitle() string {
+	return e.MetaDataObject.GrandparentTitle
 }
 
-func (s *Episode) getTitle() string {
-	return s.MetaDataObject.Title
+func (e *Episode) getTitle() string {
+	return e.MetaDataObject.Title
 }
 
-func (s *Episode) getSeasonNumber() int {
-	return int(s.MetaDataObject.ParentIndex)
+func (e *Episode) getSeasonNumber() int {
+	return int(e.MetaDataObject.ParentIndex)
 }
 
-func (s *Episode) getEpisodeNumber() int {
-	return int(s.MetaDataObject.Index)
+func (e *Episode) getEpisodeNumber() int {
+	return int(e.MetaDataObject.Index)
 }
