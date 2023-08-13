@@ -8,7 +8,7 @@ import (
 	plex "github.com/jrudio/go-plex-client"
 )
 
-func runService(conf map[string]string) {
+func runClient(conf map[string]string) {
 
 	var movie_library_keys []string
 	var show_library_keys []string

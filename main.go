@@ -22,8 +22,8 @@ func main() {
 
 	case "server":
 		runServer(conf)
-	case "service":
-		runService(conf)
+	case "client":
+		runClient(conf)
 	}
 
 }
