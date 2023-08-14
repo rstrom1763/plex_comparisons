@@ -17,6 +17,10 @@ func (s *Show) getYear() int {
 	return s.MetaDataObject.Year
 }
 
+func (s *Show) getSeasons() map[int]Season {
+	return s.Seasons
+}
+
 func (s *Show) addSeason(season Season) {
 	s.Seasons[int(season.getSeasonNumber())] = season
 }

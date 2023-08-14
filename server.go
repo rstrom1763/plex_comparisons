@@ -31,10 +31,14 @@ func findNotIn(userObjects []plex.Metadata, moviesMap2 map[string]Movie) []Movie
 
 }
 
+// Find items that are in 1 but not in 2
 func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesDump []byte, user2ShowsDump []byte, user2SeasonsDump []byte, user2EpisodesDump []byte) string {
 
 	user1Shows := make(map[string]Show)
 	user2Shows := make(map[string]Show)
+
+	//var noHave map[string]Show
+	noHave := user1Shows
 
 	var user1ShowsMetadata []plex.Metadata
 	var user1SeasonsMetadata []plex.Metadata
@@ -77,8 +81,42 @@ func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesD
 	initEpisodes(&user1EpisodesMetadata, user1Shows)
 	initEpisodes(&user2EpisodesMetadata, user2Shows)
 
-	//Implement compare logic here
-	return "test" //Temporary
+	for show := range user1Shows {
+
+		_, foundShow := user2Shows[show]
+		if foundShow {
+
+			partialShow := Show{MetaDataObject: user1Shows[show].MetaDataObject, Seasons: make(map[int]Season)}
+
+			for season := range user1Shows[show].Seasons {
+				_, foundSeason := user2Shows[show].Seasons[season]
+				if foundSeason {
+					for episode := range user1Shows[show].Seasons[season].Episodes {
+						_, foundEpisode := user2Shows[show].Seasons[season].Episodes[episode]
+						if !foundEpisode {
+							_, foundSeason2 := partialShow.Seasons[season]
+							if !foundSeason2 {
+								partialShow.addSeason(Season{MetaDataObject: user1Shows[show].Seasons[season].MetaDataObject, Episodes: make(map[int]Episode)})
+							}
+							partialShow.addEpisode(user1Shows[show].Seasons[season].Episodes[episode])
+						}
+					}
+				} else if !foundSeason {
+					partialShow.addSeason(user1Shows[show].Seasons[season])
+				}
+			}
+			if len(partialShow.Seasons) > 0 {
+				noHave[show] = partialShow
+			}
+		} else if !foundShow {
+			noHave[show] = user1Shows[show]
+		}
+	}
+	output, err := json.Marshal(noHave)
+	if err != nil {
+		log.Printf("could not marshal json: %v", err)
+	}
+	return string(output)
 }
 
 func extractMetadata(movies []Movie) []plex.Metadata {
@@ -308,8 +346,8 @@ func runServer(conf map[string]string) {
 
 		movieDiff1 := compareMovies(decompressData(user1MovieDump), decompressData(user2MovieDump))
 		movieDiff2 := compareMovies(decompressData(user2MovieDump), decompressData(user1MovieDump))
-		showsDiff1 := compareShows(decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump), decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump))
-		showsDiff2 := compareShows(decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump), decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump))
+		showsDiff1 := compareShows(decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump), decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump))
+		showsDiff2 := compareShows(decompressData(user1ShowDump), decompressData(user1SeasonsDump), decompressData(user1EpisodesDump), decompressData(user2ShowDump), decompressData(user2SeasonsDump), decompressData(user2EpisodesDump))
 
 		movieDiff1Name := user2 + "_no_have_movies.json"
 		movieDiff2Name := user1 + "_no_have_movies.json"
