@@ -371,6 +371,11 @@ func runServer(conf map[string]string) {
 
 	})
 
-	fmt.Printf("Listening on port %v...\n", conf["port"])     //Notifies that server is running on X port
-	r.RunTLS(":"+conf["port"], "./cert.pem", "./private.key") //Start running the Gin server
+	fmt.Printf("Listening on port %v...\n", conf["port"]) //Notifies that server is running on X port
+	url := fmt.Sprintf("%v:%v", conf["server_url"], conf["port"])
+	err = r.Run(url) //Start running the Gin server
+	if err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
+	//r.RunTLS(":"+conf["port"], "./cert.pem", "./private.key") //Start running the Gin server
 }

@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"database/sql"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -325,5 +326,58 @@ func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
 		}
 
 	}
+
+}
+
+// Create the DB connection
+func initDB(path string) (*sql.DB, error) {
+
+	// Create the db connection
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open DB: %s", err)
+	}
+
+	// Test if we can access the db properly
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("could not ping DB: %s", err)
+	}
+
+	return db, nil
+
+}
+
+func writeDump(filename string, data []MediaItem) error {
+	if len(data) == 0 {
+		return fmt.Errorf("input is empty")
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("could not create file: " + err.Error())
+	}
+
+	defer func(file *os.File) {
+		err = file.Close()
+		if err != nil {
+			log.Println("could not close file handle: " + err.Error())
+		}
+	}(file)
+
+	// Write header
+	_, err = file.Write([]byte("title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"))
+	if err != nil {
+		return fmt.Errorf("could not write header: " + err.Error())
+	}
+
+	// Write records
+	for _, record := range data {
+		_, err = file.Write([]byte(record.ToString()))
+		if err != nil {
+			return fmt.Errorf("could not write record to csv: " + err.Error())
+		}
+	}
+	return nil
 
 }

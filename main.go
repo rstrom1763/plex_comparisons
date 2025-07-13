@@ -11,19 +11,19 @@ func main() {
 
 	args := os.Args
 
-	if len(args) > 2 {
-		log.Fatal("Too many arguments!")
-	}
 	if len(args) == 1 {
 		log.Fatal("Not enough arguments!")
 	}
 
 	switch arg := args[1]; arg {
-
 	case "server":
 		runServer(conf)
 	case "client":
 		runClient(conf)
+	case "dump":
+		err := dump(args[2])
+		if err != nil {
+			log.Fatalf("there was an error doing the dump: " + err.Error())
+		}
 	}
-
 }
