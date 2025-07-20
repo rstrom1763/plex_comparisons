@@ -39,7 +39,7 @@ func runClient(conf map[string]string) {
 
 	//I had to manually alter the GetLibraries() function to allow not validating ssl cert
 	//Pull request into the upstream library is pending
-	sections, err := plexClient.GetLibraries(false)
+	sections, err := plexClient.GetLibraries()
 	if err != nil {
 		log.Fatalf("Could not get libraries from Plex server: %v", err)
 	}
@@ -50,7 +50,7 @@ func runClient(conf map[string]string) {
 
 		if library.Type == "movie" {
 			//An extra check to see if the library is using the movie scanners
-			//This is to distinguish the movies from the videos libraries
+			//This is to distinguish the movies from the video libraries
 			if library.Scanner == "Plex Movie Scanner" || library.Scanner == "Plex Movie" {
 				movie_library_keys = append(movie_library_keys, library.Key)
 			}
