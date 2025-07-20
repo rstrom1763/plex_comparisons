@@ -5,6 +5,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
+	"strings"
 )
 
 func dump() error {
@@ -66,19 +67,22 @@ func writeDump[T Media](filename string, data []T) error {
 		}
 	}(file)
 
-	// Write header
-	_, err = file.Write([]byte(data[0].CSVHeaders()))
-	if err != nil {
-		return fmt.Errorf("could not write header: " + err.Error())
+	var lines []string
+
+	// Add header
+	lines = append(lines, data[0].CSVHeaders())
+
+	// Add records
+	for _, record := range data {
+		lines = append(lines, record.ToCSV())
 	}
 
-	// Write records
-	for _, record := range data {
-		_, err = file.Write([]byte(record.ToCSV()))
-		if err != nil {
-			return fmt.Errorf("could not write record to csv: " + err.Error())
-		}
+	// Write data to file
+	_, err = file.Write([]byte(strings.Join(lines, "")))
+	if err != nil {
+		return fmt.Errorf("could not write dump files: %v", err)
 	}
+
 	return nil
-	
+
 }
