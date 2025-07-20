@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type Movie struct {
+type Song struct {
 	Title         string `json:"title"`       // metadata_items.title
 	ContentRating string `json:"rating"`      // metadata_items.content_rating
 	Year          int    `json:"year"`        // metadata_items.year
@@ -28,18 +28,17 @@ type Movie struct {
 	AudioCodec    string `json:"audio_codec"` // media_items.audio_codec
 }
 
-func (m *Movie) GetTitle() string {
+func (m *Song) GetTitle() string {
 	return m.Title
 }
 
-func (m *Movie) GetYear() int {
+func (m *Song) GetYear() int {
 	return m.Year
 }
 
-func (m *Movie) ToCSV() string {
+func (m *Song) ToCSV() string {
 	fields := []string{
 		m.Title,
-		m.ContentRating,
 		strconv.Itoa(m.Year),
 		m.Genre,
 		m.Library,
@@ -48,12 +47,7 @@ func (m *Movie) ToCSV() string {
 		m.Hash,
 		strconv.FormatInt(m.Size, 10),
 		strconv.FormatInt(m.Duration, 10),
-		m.Container,
 		strconv.Itoa(m.Bitrate),
-		m.VideoCodec,
-		strconv.Itoa(m.Height),
-		strconv.Itoa(m.Width),
-		m.Resolution,
 		m.AudioCodec,
 	}
 
@@ -71,37 +65,31 @@ func (m *Movie) ToCSV() string {
 	return final
 }
 
-func (m *Movie) CSVHeaders() string {
-	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
+func (m *Song) CSVHeaders() string {
+	return "title,year,genre,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
 }
 
-func getMovies(db *sql.DB) ([]*Movie, error) {
+func getSongs(db *sql.DB) ([]*Song, error) {
 
-	rows, err := db.Query(MOVIE_DUMP_QUERY)
+	rows, err := db.Query(SONG_DUMP_QUERY)
 	if err != nil {
-		return nil, fmt.Errorf("could not query Movies: " + err.Error())
+		return nil, fmt.Errorf("could not query Songs: " + err.Error())
 	}
 
 	var (
-		Title         string
-		ContentRating string
-		Year          int
-		Genre         string
-		Library       string
-		MediaType     string
-		File          string
-		Hash          string
-		Size          int64
-		Duration      int64
-		Container     string
-		Bitrate       int
-		VideoCodec    string
-		Height        int
-		Width         int
-		Resolution    string
-		AudioCodec    string
+		Title      string
+		Year       int
+		Genre      string
+		Library    string
+		MediaType  string
+		File       string
+		Hash       string
+		Size       int64
+		Duration   int64
+		Bitrate    int
+		AudioCodec string
 	)
-	var movies []*Movie
+	var Songs []*Song
 
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
@@ -111,33 +99,27 @@ func getMovies(db *sql.DB) ([]*Movie, error) {
 	}(rows)
 
 	for rows.Next() {
-		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec)
+		err = rows.Scan(&Title, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec)
 		if err != nil {
 			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
 		}
 
-		movie := Movie{
-			Title:         Title,
-			ContentRating: ContentRating,
-			Year:          Year,
-			Genre:         Genre,
-			Library:       Library,
-			MediaType:     MediaType,
-			File:          File,
-			Hash:          Hash,
-			Size:          Size,
-			Duration:      Duration,
-			Container:     Container,
-			Bitrate:       Bitrate,
-			VideoCodec:    VideoCodec,
-			Height:        Height,
-			Width:         Width,
-			Resolution:    Resolution,
-			AudioCodec:    AudioCodec,
+		Song := Song{
+			Title:      Title,
+			Year:       Year,
+			Genre:      Genre,
+			Library:    Library,
+			MediaType:  MediaType,
+			File:       File,
+			Hash:       Hash,
+			Size:       Size,
+			Duration:   Duration,
+			Bitrate:    Bitrate,
+			AudioCodec: AudioCodec,
 		}
 
-		movies = append(movies, &movie)
+		Songs = append(Songs, &Song)
 
 	}
-	return movies, nil
+	return Songs, nil
 }

@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"bytes"
 	"encoding/json"
@@ -11,148 +12,150 @@ import (
 
 	nocache "github.com/alexander-melentyev/gin-nocache"
 	"github.com/gin-gonic/gin"
-	"github.com/jrudio/go-plex-client"
+	//"github.com/jrudio/go-plex-client"
 )
-
+*/
+/*
 // Find all items in movieMap1 that are not in movieMap2
-func findNotIn(userObjects []plex.Metadata, moviesMap2 map[string]Movie) []Movie {
-	var notIn []Movie
 
-	for _, movie := range userObjects {
-		movieObject := Movie{movie}
-		_, exists := moviesMap2[movieObject.getTitle()]
+	func findNotIn(userObjects []plex.Metadata, moviesMap2 map[string]Movie) []Movie {
+		var notIn []Movie
 
-		if !exists {
-			notIn = append(notIn, movieObject)
+		for _, movie := range userObjects {
+			movieObject := Movie{movie}
+			_, exists := moviesMap2[movieObject.getTitle()]
+
+			if !exists {
+				notIn = append(notIn, movieObject)
+			}
 		}
-	}
 
-	return notIn
+		return notIn
 
 }
 
 // Find items that are in 1 but not in 2
 func compareShows(user1ShowsDump []byte, user1SeasonsDump []byte, user1EpisodesDump []byte, user2ShowsDump []byte, user2SeasonsDump []byte, user2EpisodesDump []byte) string {
 
-	user1Shows := make(map[string]Show)
-	user2Shows := make(map[string]Show)
+		user1Shows := make(map[string]Show)
+		user2Shows := make(map[string]Show)
 
-	//var noHave map[string]Show
-	noHave := user1Shows
+		//var noHave map[string]Show
+		noHave := user1Shows
 
-	var user1ShowsMetadata []plex.Metadata
-	var user1SeasonsMetadata []plex.Metadata
-	var user1EpisodesMetadata []plex.Metadata
-	var user2ShowsMetadata []plex.Metadata
-	var user2SeasonsMetadata []plex.Metadata
-	var user2EpisodesMetadata []plex.Metadata
+		var user1ShowsMetadata []plex.Metadata
+		var user1SeasonsMetadata []plex.Metadata
+		var user1EpisodesMetadata []plex.Metadata
+		var user2ShowsMetadata []plex.Metadata
+		var user2SeasonsMetadata []plex.Metadata
+		var user2EpisodesMetadata []plex.Metadata
 
-	err := json.Unmarshal(user1ShowsDump, &user1ShowsMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-	err = json.Unmarshal(user1SeasonsDump, &user1SeasonsMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-	err = json.Unmarshal(user1EpisodesDump, &user1EpisodesMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-	err = json.Unmarshal(user2ShowsDump, &user2ShowsMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-	err = json.Unmarshal(user2SeasonsDump, &user2SeasonsMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-	err = json.Unmarshal(user2EpisodesDump, &user2EpisodesMetadata)
-	if err != nil {
-		log.Println(err)
-	}
-
-	initShowsMap(&user1ShowsMetadata, user1Shows)
-	initShowsMap(&user2ShowsMetadata, user2Shows)
-
-	initSeasons(&user1SeasonsMetadata, user1Shows)
-	initSeasons(&user2SeasonsMetadata, user2Shows)
-
-	initEpisodes(&user1EpisodesMetadata, user1Shows)
-	initEpisodes(&user2EpisodesMetadata, user2Shows)
-
-	for show := range user1Shows {
-
-		_, foundShow := user2Shows[show]
-		if foundShow {
-
-			partialShow := Show{MetaDataObject: user1Shows[show].MetaDataObject, Seasons: make(map[int]Season)}
-
-			for season := range user1Shows[show].Seasons {
-				_, foundSeason := user2Shows[show].Seasons[season]
-				if foundSeason {
-					for episode := range user1Shows[show].Seasons[season].Episodes {
-						_, foundEpisode := user2Shows[show].Seasons[season].Episodes[episode]
-						if !foundEpisode {
-							_, foundSeason2 := partialShow.Seasons[season]
-							if !foundSeason2 {
-								partialShow.addSeason(Season{MetaDataObject: user1Shows[show].Seasons[season].MetaDataObject, Episodes: make(map[int]Episode)})
-							}
-							partialShow.addEpisode(user1Shows[show].Seasons[season].Episodes[episode])
-						}
-					}
-				} else if !foundSeason {
-					partialShow.addSeason(user1Shows[show].Seasons[season])
-				}
-			}
-			if len(partialShow.Seasons) > 0 {
-				noHave[show] = partialShow
-			}
-		} else if !foundShow {
-			noHave[show] = user1Shows[show]
+		err := json.Unmarshal(user1ShowsDump, &user1ShowsMetadata)
+		if err != nil {
+			log.Println(err)
 		}
-	}
-	output, err := json.Marshal(noHave)
-	if err != nil {
-		log.Printf("could not marshal json: %v", err)
-	}
-	return string(output)
-}
+		err = json.Unmarshal(user1SeasonsDump, &user1SeasonsMetadata)
+		if err != nil {
+			log.Println(err)
+		}
+		err = json.Unmarshal(user1EpisodesDump, &user1EpisodesMetadata)
+		if err != nil {
+			log.Println(err)
+		}
+		err = json.Unmarshal(user2ShowsDump, &user2ShowsMetadata)
+		if err != nil {
+			log.Println(err)
+		}
+		err = json.Unmarshal(user2SeasonsDump, &user2SeasonsMetadata)
+		if err != nil {
+			log.Println(err)
+		}
+		err = json.Unmarshal(user2EpisodesDump, &user2EpisodesMetadata)
+		if err != nil {
+			log.Println(err)
+		}
 
-func extractMetadata(movies []Movie) []plex.Metadata {
-	var output []plex.Metadata
-	for _, movie := range movies {
-		output = append(output, movie.getMetadata())
+		initShowsMap(&user1ShowsMetadata, user1Shows)
+		initShowsMap(&user2ShowsMetadata, user2Shows)
+
+		initSeasons(&user1SeasonsMetadata, user1Shows)
+		initSeasons(&user2SeasonsMetadata, user2Shows)
+
+		initEpisodes(&user1EpisodesMetadata, user1Shows)
+		initEpisodes(&user2EpisodesMetadata, user2Shows)
+
+		for show := range user1Shows {
+
+			_, foundShow := user2Shows[show]
+			if foundShow {
+
+				partialShow := Show{MetaDataObject: user1Shows[show].MetaDataObject, Seasons: make(map[int]Season)}
+
+				for season := range user1Shows[show].Seasons {
+					_, foundSeason := user2Shows[show].Seasons[season]
+					if foundSeason {
+						for episode := range user1Shows[show].Seasons[season].Episodes {
+							_, foundEpisode := user2Shows[show].Seasons[season].Episodes[episode]
+							if !foundEpisode {
+								_, foundSeason2 := partialShow.Seasons[season]
+								if !foundSeason2 {
+									partialShow.addSeason(Season{MetaDataObject: user1Shows[show].Seasons[season].MetaDataObject, Episodes: make(map[int]Episode)})
+								}
+								partialShow.addEpisode(user1Shows[show].Seasons[season].Episodes[episode])
+							}
+						}
+					} else if !foundSeason {
+						partialShow.addSeason(user1Shows[show].Seasons[season])
+					}
+				}
+				if len(partialShow.Seasons) > 0 {
+					noHave[show] = partialShow
+				}
+			} else if !foundShow {
+				noHave[show] = user1Shows[show]
+			}
+		}
+		output, err := json.Marshal(noHave)
+		if err != nil {
+			log.Printf("could not marshal json: %v", err)
+		}
+		return string(output)
 	}
-	return output
-}
+
+	func extractMetadata(movies []Movie) []plex.Metadata {
+		var output []plex.Metadata
+		for _, movie := range movies {
+			output = append(output, movie.getMetadata())
+		}
+		return output
+	}
 
 func compareMovies(user1Data []byte, user2Data []byte) string {
 
-	var user1Objects []plex.Metadata
-	var user2Objects []plex.Metadata
-	user1Map := make(map[string]Movie)
-	user2Map := make(map[string]Movie)
+		var user1Objects []plex.Metadata
+		var user2Objects []plex.Metadata
+		user1Map := make(map[string]Movie)
+		user2Map := make(map[string]Movie)
 
-	err := json.Unmarshal(user1Data, &user1Objects)
-	if err != nil {
-		log.Fatalf("Could not unmarshal JSON: %v", err)
-	}
-	err = json.Unmarshal(user2Data, &user2Objects)
-	if err != nil {
-		log.Fatalf("Could not unmarshal JSON: %v", err)
-	}
+		err := json.Unmarshal(user1Data, &user1Objects)
+		if err != nil {
+			log.Fatalf("Could not unmarshal JSON: %v", err)
+		}
+		err = json.Unmarshal(user2Data, &user2Objects)
+		if err != nil {
+			log.Fatalf("Could not unmarshal JSON: %v", err)
+		}
 
-	initMoviesMap(&user1Objects, user1Map)
-	initMoviesMap(&user2Objects, user2Map)
+		initMoviesMap(&user1Objects, user1Map)
+		initMoviesMap(&user2Objects, user2Map)
 
-	diff := findNotIn(user1Objects, user2Map)
-	output, err := json.Marshal(extractMetadata(diff))
-	if err != nil {
-		log.Fatalf("Could not marshal JSON: %v", err)
+		diff := findNotIn(user1Objects, user2Map)
+		output, err := json.Marshal(extractMetadata(diff))
+		if err != nil {
+			log.Fatalf("Could not marshal JSON: %v", err)
+		}
+		return string(output)
 	}
-	return string(output)
-}
 
 func runServer(conf map[string]string) {
 
@@ -379,3 +382,4 @@ func runServer(conf map[string]string) {
 	}
 	//r.RunTLS(":"+conf["port"], "./cert.pem", "./private.key") //Start running the Gin server
 }
+*/

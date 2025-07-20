@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+type Media interface {
+	ToCSV() string
+	CSVHeaders() string
+}
+
 type MediaItem struct {
 	Title         string `json:"title"`  // metadata_items.title
 	ContentRating string `json:"rating"` // metadata_items.content_rating
@@ -29,7 +34,7 @@ type MediaItem struct {
 	AudioCodec string `json:"audio_codec"` // media_items.audio_codec
 }
 
-func (m *MediaItem) ToString() string {
+func (m *MediaItem) ToCSV() string {
 	fields := []string{
 		m.Title,
 		m.ContentRating,
@@ -62,4 +67,8 @@ func (m *MediaItem) ToString() string {
 	final += "\n"
 
 	return final
+}
+
+func (m *MediaItem) CSVHeaders() string {
+	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
 }

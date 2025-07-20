@@ -7,7 +7,7 @@ import (
 
 func main() {
 
-	conf := initConf()
+	//conf := initConf()
 
 	args := os.Args
 
@@ -17,13 +17,13 @@ func main() {
 
 	switch arg := args[1]; arg {
 	case "server":
-		runServer(conf)
+		//runServer(conf)
 	case "client":
-		runClient(conf)
+		//runClient(conf)
 	case "dump":
-		err := dump(args[2])
+		err := dump()
 		if err != nil {
-			log.Fatalf("there was an error doing the dump: " + err.Error())
+			log.Fatalf("there was an error doing the csv dump: " + err.Error())
 		}
 	}
 }

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jrudio/go-plex-client"
 )
 
 func compressData(data []byte) []byte {
@@ -201,8 +200,8 @@ func sendAsFile(c *gin.Context, file File) {
 	c.File("./" + filename)
 }
 
-func postData(serverUrl string, data []byte, username string, validate_ssl bool) {
-	if !validate_ssl {
+func postData(serverUrl string, data []byte, username string, validateSsl bool) {
+	if !validateSsl {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
@@ -264,16 +263,18 @@ func returnErr(c *gin.Context, statusCode int, err error) {
 	c.Data(statusCode, "text/plain", []byte(err.Error()))
 }
 
+/*
+
 func initMoviesMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
 
 	for _, movie := range *userObjects {
 		newMovie := Movie{movie}
-		_, exists := userMap[newMovie.getTitle()]
+		_, exists := userMap[newMovie.GetTitle()]
 
 		if exists {
 			log.Println("Movie with Duplicate name: " + movie.Title)
 		} else {
-			userMap[newMovie.getTitle()] = newMovie
+			userMap[newMovie.GetTitle()] = newMovie
 		}
 
 	}
@@ -328,6 +329,7 @@ func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
 	}
 
 }
+*/
 
 // Create the DB connection
 func initDB(path string) (*sql.DB, error) {
@@ -345,39 +347,5 @@ func initDB(path string) (*sql.DB, error) {
 	}
 
 	return db, nil
-
-}
-
-func writeDump(filename string, data []MediaItem) error {
-	if len(data) == 0 {
-		return fmt.Errorf("input is empty")
-	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("could not create file: " + err.Error())
-	}
-
-	defer func(file *os.File) {
-		err = file.Close()
-		if err != nil {
-			log.Println("could not close file handle: " + err.Error())
-		}
-	}(file)
-
-	// Write header
-	_, err = file.Write([]byte("title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"))
-	if err != nil {
-		return fmt.Errorf("could not write header: " + err.Error())
-	}
-
-	// Write records
-	for _, record := range data {
-		_, err = file.Write([]byte(record.ToString()))
-		if err != nil {
-			return fmt.Errorf("could not write record to csv: " + err.Error())
-		}
-	}
-	return nil
 
 }

@@ -7,6 +7,7 @@ type Season struct {
 	Episodes       map[int]Episode
 }
 
+/*
 func (s *Season) getShowTitle() string {
 	return s.MetaDataObject.ParentTitle
 }
@@ -22,3 +23,4 @@ func (s *Season) getSeasonNumber() int {
 func (s *Season) addEpisode(episode Episode) {
 	s.Episodes[int(episode.getEpisodeNumber())] = episode
 }
+*/
