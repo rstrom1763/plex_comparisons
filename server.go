@@ -285,7 +285,7 @@ func runServer(conf map[string]string) {
 
 			userDump, err := json.Marshal(users)
 			if err != nil {
-				fmt.Println("There was an error marshalling user json data")
+				fmt.Println("There was an error marshaling user json data")
 			}
 
 			os.WriteFile("./data/users.json", userDump, 0644)
