@@ -194,7 +194,7 @@ func sendAsFile(c *gin.Context, file File) {
 	// Set the appropriate headers for the download
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Header("Content-Type", "text/plain")
-	c.Header("Content-Length", string(len(data)))
+	c.Header("Content-Length", string(rune(len(data))))
 
 	// Write the text content as the response body
 	c.File("./" + filename)

@@ -2,8 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -140,6 +143,117 @@ func getEpisodes(db *sql.DB) ([]*Episode, error) {
 			Resolution:    Resolution,
 			AudioCodec:    AudioCodec,
 		}
+		episodes = append(episodes, e)
+	}
+
+	return episodes, nil
+}
+
+func getEpisodesFromCSVFile(path string) ([]*Episode, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open csv file")
+	}
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			log.Printf("could not close csv file: %v", path)
+		}
+	}()
+
+	r := csv.NewReader(f)
+	// Expect exactly 19 columns (see Episode.CSVHeaders / Episode.ToCSV)
+	r.FieldsPerRecord = 19
+
+	var episodes []*Episode
+	row := 0
+
+	trim := func(s string) string { return strings.TrimSpace(s) }
+	atoi := func(s string) (int, error) {
+		if s = trim(s); s == "" {
+			return 0, nil
+		}
+		return strconv.Atoi(s)
+	}
+	atoi64 := func(s string) (int64, error) {
+		if s = trim(s); s == "" {
+			return 0, nil
+		}
+		return strconv.ParseInt(s, 10, 64)
+	}
+
+	for {
+		rec, err := r.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("csv read error on row %d: %w", row, err)
+		}
+		row++
+
+		// Skip header row if present
+		if row == 1 && len(rec) == 19 &&
+			strings.EqualFold(trim(rec[0]), "show_title") &&
+			strings.EqualFold(trim(rec[1]), "season_number") &&
+			strings.EqualFold(trim(rec[2]), "episode_number") {
+			continue
+		}
+
+		season, err := atoi(rec[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid season_number on row %d: %w", row, err)
+		}
+		epNum, err := atoi(rec[2])
+		if err != nil {
+			return nil, fmt.Errorf("invalid episode_number on row %d: %w", row, err)
+		}
+		year, err := atoi(rec[5])
+		if err != nil {
+			return nil, fmt.Errorf("invalid year on row %d: %w", row, err)
+		}
+		size, err := atoi64(rec[10])
+		if err != nil {
+			return nil, fmt.Errorf("invalid size on row %d: %w", row, err)
+		}
+		duration, err := atoi64(rec[11])
+		if err != nil {
+			return nil, fmt.Errorf("invalid duration on row %d: %w", row, err)
+		}
+		bitrate, err := atoi(rec[13])
+		if err != nil {
+			return nil, fmt.Errorf("invalid bitrate on row %d: %w", row, err)
+		}
+		height, err := atoi(rec[15])
+		if err != nil {
+			return nil, fmt.Errorf("invalid height on row %d: %w", row, err)
+		}
+		width, err := atoi(rec[16])
+		if err != nil {
+			return nil, fmt.Errorf("invalid width on row %d: %w", row, err)
+		}
+
+		e := &Episode{
+			ShowTitle:     trim(rec[0]),
+			SeasonNumber:  season,
+			EpisodeNumber: epNum,
+			EpisodeTitle:  trim(rec[3]),
+			ContentRating: trim(rec[4]),
+			Year:          year,
+			Library:       trim(rec[6]),
+			MediaType:     trim(rec[7]),
+			File:          trim(rec[8]),
+			Hash:          trim(rec[9]),
+			Size:          size,
+			Duration:      duration,
+			Container:     trim(rec[12]),
+			Bitrate:       bitrate,
+			VideoCodec:    trim(rec[14]),
+			Height:        height,
+			Width:         width,
+			Resolution:    trim(rec[17]),
+			AudioCodec:    trim(rec[18]),
+		}
+
 		episodes = append(episodes, e)
 	}
 

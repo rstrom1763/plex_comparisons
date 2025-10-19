@@ -2,8 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -122,4 +124,91 @@ func getSongs(db *sql.DB) ([]*Song, error) {
 
 	}
 	return Songs, nil
+}
+
+func getSongsFromCSVFile(path string) ([]*Song, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open csv file")
+	}
+	defer func(file *os.File) {
+		if err := file.Close(); err != nil {
+			log.Printf("could not close csv file: %v", path)
+		}
+	}(file)
+
+	r := csv.NewReader(file)
+	// We expect exactly 11 columns (see Song.CSVHeaders / Song.ToCSV)
+	r.FieldsPerRecord = 11
+
+	var songs []*Song
+	row := 0
+
+	for {
+		record, err := r.Read()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, fmt.Errorf("csv read error on row %d: %w", row, err)
+		}
+		row++
+
+		// Skip header row if present
+		if row == 1 && len(record) == 11 &&
+			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
+			strings.EqualFold(strings.TrimSpace(record[1]), "year") {
+			continue
+		}
+
+		trim := func(s string) string { return strings.TrimSpace(s) }
+
+		atoi := func(s string) (int, error) {
+			if s = trim(s); s == "" {
+				return 0, nil
+			}
+			return strconv.Atoi(s)
+		}
+		atoi64 := func(s string) (int64, error) {
+			if s = trim(s); s == "" {
+				return 0, nil
+			}
+			return strconv.ParseInt(s, 10, 64)
+		}
+
+		year, err := atoi(record[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid year on row %d: %w", row, err)
+		}
+		size, err := atoi64(record[7])
+		if err != nil {
+			return nil, fmt.Errorf("invalid size on row %d: %w", row, err)
+		}
+		duration, err := atoi64(record[8])
+		if err != nil {
+			return nil, fmt.Errorf("invalid duration on row %d: %w", row, err)
+		}
+		bitrate, err := atoi(record[9])
+		if err != nil {
+			return nil, fmt.Errorf("invalid bitrate on row %d: %w", row, err)
+		}
+
+		s := &Song{
+			Title:      trim(record[0]),
+			Year:       year,
+			Genre:      trim(record[2]),
+			Library:    trim(record[3]),
+			MediaType:  trim(record[4]),
+			File:       trim(record[5]),
+			Hash:       trim(record[6]),
+			Size:       size,
+			Duration:   duration,
+			Bitrate:    bitrate,
+			AudioCodec: trim(record[10]),
+		}
+
+		songs = append(songs, s)
+	}
+
+	return songs, nil
 }

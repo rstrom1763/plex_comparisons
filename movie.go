@@ -2,8 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -139,5 +141,108 @@ func getMovies(db *sql.DB) ([]*Movie, error) {
 		movies = append(movies, &movie)
 
 	}
+	return movies, nil
+}
+
+func getMoviesFromCSVFile(path string) ([]*Movie, error) {
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open csv file")
+	}
+
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Printf("could not close csv file: %v", path)
+		}
+	}(file)
+
+	csvReader := csv.NewReader(file)
+	csvReader.FieldsPerRecord = 17
+
+	var movies []*Movie
+	row := 0
+
+	for {
+		record, err := csvReader.Read()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, fmt.Errorf("csv read error on row %d: %w", row, err)
+		}
+		row++
+
+		// Skip header row
+		if row == 1 && len(record) == 17 &&
+			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
+			strings.EqualFold(strings.TrimSpace(record[1]), "rating") {
+			continue
+		}
+
+		trim := func(s string) string { return strings.TrimSpace(s) }
+
+		atoi := func(s string) (int, error) {
+			if s = trim(s); s == "" {
+				return 0, nil
+			}
+			return strconv.Atoi(s)
+		}
+		atoi64 := func(s string) (int64, error) {
+			if s = trim(s); s == "" {
+				return 0, nil
+			}
+			return strconv.ParseInt(s, 10, 64)
+		}
+
+		year, err := atoi(record[2])
+		if err != nil {
+			return nil, fmt.Errorf("invalid year on row %d: %w", row, err)
+		}
+		size, err := atoi64(record[8])
+		if err != nil {
+			return nil, fmt.Errorf("invalid size on row %d: %w", row, err)
+		}
+		duration, err := atoi64(record[9])
+		if err != nil {
+			return nil, fmt.Errorf("invalid duration on row %d: %w", row, err)
+		}
+		bitrate, err := atoi(record[11])
+		if err != nil {
+			return nil, fmt.Errorf("invalid bitrate on row %d: %w", row, err)
+		}
+		height, err := atoi(record[13])
+		if err != nil {
+			return nil, fmt.Errorf("invalid height on row %d: %w", row, err)
+		}
+		width, err := atoi(record[14])
+		if err != nil {
+			return nil, fmt.Errorf("invalid width on row %d: %w", row, err)
+		}
+
+		movie := &Movie{
+			Title:         trim(record[0]),
+			ContentRating: trim(record[1]),
+			Year:          year,
+			Genre:         trim(record[3]),
+			Library:       trim(record[4]),
+			MediaType:     trim(record[5]),
+			File:          trim(record[6]),
+			Hash:          trim(record[7]),
+			Size:          size,
+			Duration:      duration,
+			Container:     trim(record[10]),
+			Bitrate:       bitrate,
+			VideoCodec:    trim(record[12]),
+			Height:        height,
+			Width:         width,
+			Resolution:    trim(record[15]),
+			AudioCodec:    trim(record[16]),
+		}
+
+		movies = append(movies, movie)
+	}
+
 	return movies, nil
 }
