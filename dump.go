@@ -1,11 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
 	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func dump() error {
@@ -14,6 +16,13 @@ func dump() error {
 	if err != nil {
 		return fmt.Errorf("there was an error initializing the DB connection: " + err.Error())
 	}
+
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatal("could not close Plex database: ", err)
+		}
+	}(db)
 
 	movies, err := getMovies(db)
 	if err != nil {
