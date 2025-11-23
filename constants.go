@@ -1,6 +1,6 @@
 package main
 
-const PLEX_DB_PATH string = "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db"
+const DOTENV_PATH = ".env"
 
 const DUMP_QUERY string = `SELECT
     metadata_items.title,

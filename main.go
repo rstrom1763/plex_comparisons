@@ -7,8 +7,6 @@ import (
 
 func main() {
 
-	//conf := initConf()
-
 	args := os.Args
 
 	if len(args) == 1 {
@@ -21,9 +19,13 @@ func main() {
 	case "client":
 		//runClient(conf)
 	case "dump":
-		err := dump()
+		plexDbPath, err := env("PLEX_DB_PATH")
 		if err != nil {
-			log.Fatalf("there was an error doing the csv dump: " + err.Error())
+			log.Fatalf("env variable PLEX_DB_PATH is empty")
+		}
+		err = dump(plexDbPath)
+		if err != nil {
+			log.Fatalf("there was an error performing the csv dump: " + err.Error())
 		}
 	}
 }

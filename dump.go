@@ -10,9 +10,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func dump() error {
+func dump(plexDbPath string) error {
 
-	db, err := initDB(PLEX_DB_PATH)
+	db, err := initDB(plexDbPath)
 	if err != nil {
 		return fmt.Errorf("there was an error initializing the DB connection: " + err.Error())
 	}

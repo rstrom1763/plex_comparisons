@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func compressData(data []byte) []byte {
@@ -348,4 +349,16 @@ func initDB(path string) (*sql.DB, error) {
 
 	return db, nil
 
+}
+
+// Get key from the env file
+func env(key string) (string, error) {
+
+	// load .env file
+	err := godotenv.Load(DOTENV_PATH)
+	if err != nil {
+		return "", fmt.Errorf("error loading .env file: %s", err)
+	}
+
+	return os.Getenv(key), nil
 }
