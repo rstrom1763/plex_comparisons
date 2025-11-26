@@ -24,6 +24,9 @@ jobs:
       - name: Build binary
         run: go build -o plex_compare .
 
+      - name: Strip binary
+        run: strip ./plex_compare
+
       - name: Prepare dist folder
         run: |
           mkdir -p dist
