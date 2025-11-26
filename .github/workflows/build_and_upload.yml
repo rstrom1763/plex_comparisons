@@ -44,10 +44,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -o ${{ matrix.bin_name }} .
-
-      - name: Strip binary
-        run: strip ./${{ matrix.bin_name }}
+          go build -ldflags="-s -w" -o ${{ matrix.bin_name }} .
 
       - name: Prepare dist folder
         run: |
