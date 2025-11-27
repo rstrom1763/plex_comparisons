@@ -10,7 +10,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -19,11 +18,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
@@ -175,33 +172,6 @@ func fileExists(filename string) bool {
 	return false // Error occurred (e.g., permission denied)
 }
 
-// Clears the screen
-func clear() {
-	c := exec.Command("clear")
-	c.Stdout = os.Stdout
-	c.Run()
-}
-
-func sendAsFile(c *gin.Context, file File) {
-
-	filename := file.Name
-	data := file.Data
-
-	err := os.WriteFile("./"+filename, data, 0644)
-	if err != nil {
-		log.Fatalf("Could not write file: %v", err)
-	}
-	defer os.Remove("./" + filename)
-
-	// Set the appropriate headers for the download
-	c.Header("Content-Disposition", "attachment; filename="+filename)
-	c.Header("Content-Type", "text/plain")
-	c.Header("Content-Length", string(rune(len(data))))
-
-	// Write the text content as the response body
-	c.File("./" + filename)
-}
-
 func postData(serverUrl string, data []byte, username string, validateSsl bool) {
 	if !validateSsl {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -243,95 +213,6 @@ func ensureFolderExists(path string) error {
 	}
 	return nil
 }
-
-func initConf() map[string]string {
-
-	raw_conf, err := os.ReadFile("./config.json")
-	if err != nil {
-		log.Fatalf("Could not read config file: %v", err)
-	}
-
-	//Unmarshall the raw json into a string map for use in the code
-	var conf map[string]string
-	err = json.Unmarshal(raw_conf, &conf)
-	if err != nil {
-		log.Fatalf("Could not unmarshall conf json: %v", err)
-	}
-	return conf
-
-}
-
-func returnErr(c *gin.Context, statusCode int, err error) {
-	c.Data(statusCode, "text/plain", []byte(err.Error()))
-}
-
-/*
-
-func initMoviesMap(userObjects *[]plex.Metadata, userMap map[string]Movie) {
-
-	for _, movie := range *userObjects {
-		newMovie := Movie{movie}
-		_, exists := userMap[newMovie.GetTitle()]
-
-		if exists {
-			log.Println("Movie with Duplicate name: " + movie.Title)
-		} else {
-			userMap[newMovie.GetTitle()] = newMovie
-		}
-
-	}
-
-}
-
-func initShowsMap(userObjects *[]plex.Metadata, userMap map[string]Show) {
-
-	for _, show := range *userObjects {
-		newShow := Show{MetaDataObject: show, Seasons: make(map[int]Season)}
-		_, exists := userMap[newShow.getTitle()]
-
-		if exists {
-			log.Println("Show with Duplicate name: " + show.Title)
-		} else {
-			userMap[newShow.getTitle()] = newShow
-		}
-
-	}
-
-}
-
-func initSeasons(seasons *[]plex.Metadata, showMap map[string]Show) {
-
-	for _, season := range *seasons {
-		newSeason := Season{MetaDataObject: season, Episodes: make(map[int]Episode)}
-		show, exists := showMap[newSeason.getShowTitle()]
-
-		if exists {
-			show.addSeason(newSeason)
-		} else {
-			log.Printf("Missing Show(Season): %v", newSeason.getShowTitle())
-		}
-
-	}
-
-}
-
-func initEpisodes(episodes *[]plex.Metadata, showMap map[string]Show) {
-
-	for _, episode := range *episodes {
-		newEpisode := Episode{MetaDataObject: episode}
-		show, exists := showMap[newEpisode.getShowTitle()]
-
-		if exists {
-			season := show.getSeason(newEpisode.getSeasonNumber())
-			season.addEpisode(newEpisode)
-		} else {
-			log.Printf("Missing Show(Episode): %v", newEpisode.getShowTitle())
-		}
-
-	}
-
-}
-*/
 
 // Create the DB connection
 func initDB(path string) (*sql.DB, error) {
