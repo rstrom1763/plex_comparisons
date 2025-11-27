@@ -8,6 +8,7 @@ import (
 type Media interface {
 	ToCSV() string
 	CSVHeaders() string
+	GetUniqueTitle() string
 }
 
 type MediaItem struct {
@@ -71,4 +72,17 @@ func (m *MediaItem) ToCSV() string {
 
 func (m *MediaItem) CSVHeaders() string {
 	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
+}
+
+func toMediaSlice[T Media](media []T) []Media {
+	result := make([]Media, len(media))
+	for i, _ := range media {
+		result[i] = media[i]
+	}
+	return result
+}
+
+// ToMedia Adapts input to be of Media type
+func ToMedia[T Media](mediaItem Media) Media {
+	return mediaItem
 }

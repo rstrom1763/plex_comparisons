@@ -30,27 +30,27 @@ type Song struct {
 	AudioCodec    string `json:"audio_codec"` // media_items.audio_codec
 }
 
-func (m *Song) GetTitle() string {
-	return m.Title
+func (s *Song) GetTitle() string {
+	return s.Title
 }
 
-func (m *Song) GetYear() int {
-	return m.Year
+func (s *Song) GetYear() int {
+	return s.Year
 }
 
-func (m *Song) ToCSV() string {
+func (s *Song) ToCSV() string {
 	fields := []string{
-		m.Title,
-		strconv.Itoa(m.Year),
-		m.Genre,
-		m.Library,
-		m.MediaType,
-		m.File,
-		m.Hash,
-		strconv.FormatInt(m.Size, 10),
-		strconv.FormatInt(m.Duration, 10),
-		strconv.Itoa(m.Bitrate),
-		m.AudioCodec,
+		s.Title,
+		strconv.Itoa(s.Year),
+		s.Genre,
+		s.Library,
+		s.MediaType,
+		s.File,
+		s.Hash,
+		strconv.FormatInt(s.Size, 10),
+		strconv.FormatInt(s.Duration, 10),
+		strconv.Itoa(s.Bitrate),
+		s.AudioCodec,
 	}
 
 	// Escape commas or quotes by wrapping each field in quotes if necessary
@@ -67,7 +67,7 @@ func (m *Song) ToCSV() string {
 	return final
 }
 
-func (m *Song) CSVHeaders() string {
+func (s *Song) CSVHeaders() string {
 	return "title,year,genre,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
 }
 
@@ -211,4 +211,10 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 	}
 
 	return songs, nil
+}
+
+// GetUniqueTitle Aggregates Title and Year to avoid issues with songs with same title
+func (s *Song) GetUniqueTitle() string {
+	uniqueTitle := fmt.Sprintf("%s %s", s.Title, strconv.Itoa(s.Year))
+	return uniqueTitle
 }

@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -361,4 +362,10 @@ func env(key string) (string, error) {
 	}
 
 	return os.Getenv(key), nil
+}
+
+func addNoHaveToPath(path string) string {
+	prefix := path[:strings.LastIndex(path, ".")]
+	fileExtension := path[strings.LastIndex(path, "."):]
+	return prefix + "_no_have" + fileExtension
 }

@@ -29,7 +29,7 @@ func dump(plexDbPath string) error {
 		return fmt.Errorf("could not fetch movies from DB: %v", err.Error())
 	}
 
-	err = writeDump("./movies.csv", movies)
+	err = writeCSV("./movies.csv", movies)
 	if err != nil {
 		return fmt.Errorf("error writing movies dump: " + err.Error())
 	}
@@ -39,7 +39,7 @@ func dump(plexDbPath string) error {
 		return fmt.Errorf("could not fetch songs from DB: %v", err.Error())
 	}
 
-	err = writeDump("./songs.csv", songs)
+	err = writeCSV("./songs.csv", songs)
 	if err != nil {
 		return fmt.Errorf("error writing songs dump: " + err.Error())
 	}
@@ -49,7 +49,7 @@ func dump(plexDbPath string) error {
 		return fmt.Errorf("could not fetch episodes from DB: %v", err.Error())
 	}
 
-	err = writeDump("./episodes.csv", episodes)
+	err = writeCSV("./episodes.csv", episodes)
 	if err != nil {
 		return fmt.Errorf("error writing epidodes dump: " + err.Error())
 	}
@@ -58,7 +58,7 @@ func dump(plexDbPath string) error {
 
 }
 
-func writeDump[T Media](filename string, data []T) error {
+func writeCSV[T Media](filename string, data []T) error {
 
 	if len(data) == 0 {
 		return fmt.Errorf("input is empty")

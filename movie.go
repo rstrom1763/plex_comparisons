@@ -246,3 +246,9 @@ func getMoviesFromCSVFile(path string) ([]*Movie, error) {
 
 	return movies, nil
 }
+
+// GetUniqueTitle Aggregates Title and Year to avoid issues with movies with same title
+func (m *Movie) GetUniqueTitle() string {
+	uniqueTitle := fmt.Sprintf("%s %s", m.Title, strconv.Itoa(m.Year))
+	return uniqueTitle
+}
