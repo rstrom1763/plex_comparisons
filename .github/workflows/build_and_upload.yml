@@ -1,0 +1,88 @@
+name: Build & publish latest plex_compare
+
+on:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            arch: amd64
+            bin_name: plex_compare-linux-amd64
+          - goos: linux
+            arch: arm64
+            bin_name: plex_compare-linux-arm64
+          - goos: windows
+            arch: amd64
+            bin_name: plex_compare-windows-amd64.exe
+          - goos: darwin
+            arch: amd64
+            bin_name: plex_compare-darwin-amd64
+          - goos: darwin
+            arch: arm64
+            bin_name: plex_compare-darwin-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary for ${{ matrix.goos }}-${{ matrix.arch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build -ldflags="-s -w" -o ${{ matrix.bin_name }} .
+
+      - name: Prepare dist folder
+        run: |
+          mkdir -p dist
+          cp ${{ matrix.bin_name }} dist/
+
+      - name: Upload build artifact for ${{ matrix.goos }}-${{ matrix.arch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin_name }}
+          path: dist/${{ matrix.bin_name }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: List dist contents
+        run: |
+          ls -R dist
+
+      - name: Create / update 'latest' GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest plex_compare build
+          make_latest: "true"
+          target_commitish: ${{ github.sha }}
+          files: |
+            dist/**/plex_compare-linux-amd64
+            dist/**/plex_compare-linux-arm64
+            dist/**/plex_compare-windows-amd64.exe
+            dist/**/plex_compare-darwin-amd64
+            dist/**/plex_compare-darwin-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
