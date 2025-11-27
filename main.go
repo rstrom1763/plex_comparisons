@@ -15,10 +15,6 @@ func main() {
 	}
 
 	switch arg := args[1]; arg {
-	case "server":
-		//runServer(conf)
-	case "client":
-		//runClient(conf)
 	case "dump":
 		plexDbPath, err := env("PLEX_DB_PATH")
 		if err != nil {
