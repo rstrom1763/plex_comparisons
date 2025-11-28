@@ -262,6 +262,6 @@ func getEpisodesFromCSVFile(path string) ([]*Episode, error) {
 
 // GetUniqueTitle Aggregates ShowTitle, EpisodeTitle and Year to avoid issues with episodes with same title
 func (e *Episode) GetUniqueTitle() string {
-	uniqueTitle := fmt.Sprintf("%s %s %d", e.ShowTitle, e.EpisodeTitle, e.Year)
+	uniqueTitle := fmt.Sprintf("%s %d %s %d", e.ShowTitle, e.SeasonNumber, e.EpisodeTitle, e.Year)
 	return uniqueTitle
 }
