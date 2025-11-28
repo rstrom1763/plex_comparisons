@@ -39,6 +39,13 @@ func main() {
 		dump1Path := args[2]
 		dump2Path := args[3]
 
+		if !fileExists(dump1Path) {
+			log.Fatalf("%s does not exist", dump1Path)
+		}
+		if !fileExists(dump2Path) {
+			log.Fatalf("%s does not exist", dump2Path)
+		}
+
 		compare(dump1Path, dump2Path, providedMediaType)
 	default:
 		log.Fatalf("Unknown command: %s", arg)
