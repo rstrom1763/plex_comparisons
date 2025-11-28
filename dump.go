@@ -61,7 +61,8 @@ func dump(plexDbPath string) error {
 func writeCSV[T Media](filename string, data []T) error {
 
 	if len(data) == 0 {
-		return fmt.Errorf("input is empty")
+		log.Printf("skipping %s, input is empty\n", filename)
+		return nil
 	}
 
 	file, err := os.Create(filename)
