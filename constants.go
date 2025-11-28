@@ -67,7 +67,8 @@ FROM metadata_items
     JOIN media_items ON media_items.metadata_item_id = metadata_items.id
     JOIN media_parts ON media_parts.media_item_id = media_items.id
     JOIN library_sections ON media_items.library_section_id = library_sections.id
-WHERE section_type = 1;`
+WHERE section_type = 1
+ORDER BY metadata_items.title;`
 
 const SONG_DUMP_QUERY string = `SELECT
     metadata_items.title                         AS track_title,
