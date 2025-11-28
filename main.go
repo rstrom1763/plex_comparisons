@@ -36,5 +36,7 @@ func main() {
 		}
 
 		compare(args[2], args[3], args[4])
+	default:
+		log.Fatalf("Unknown command: %s", arg)
 	}
 }

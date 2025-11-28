@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -75,7 +76,7 @@ func getMediaItems(path1 string, path2 string, mediaType string) ([]Media, []Med
 		return toMediaSlice(mediaList1), toMediaSlice(mediaList2), nil
 	}
 
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("unknown media type: %s", mediaType)
 }
 
 func compare(dumpFilePath1 string, dumpFilePath2 string, mediaType string) {

@@ -51,7 +51,7 @@ func dump(plexDbPath string) error {
 
 	err = writeCSV("./episodes.csv", episodes)
 	if err != nil {
-		return fmt.Errorf("error writing epidodes dump: " + err.Error())
+		return fmt.Errorf("error writing episodes dump: " + err.Error())
 	}
 
 	return nil
