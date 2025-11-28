@@ -16,6 +16,10 @@ func main() {
 
 	switch arg := args[1]; arg {
 	case "dump":
+		if len(args) != 2 {
+			log.Fatalf("Expected 1 argument, got %d", len(args)-1)
+		}
+
 		plexDbPath, err := env("PLEX_DB_PATH")
 		if err != nil {
 			log.Fatalf("env variable PLEX_DB_PATH is empty")
