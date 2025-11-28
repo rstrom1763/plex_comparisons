@@ -30,12 +30,16 @@ func main() {
 		}
 
 		acceptedMediaTypes := []string{"movie", "show", "song"}
+		providedMediaType := args[4]
 
-		if !slices.Contains(acceptedMediaTypes, args[4]) {
-			log.Fatalf("Not an accepted media type: %s", args[4])
+		if !slices.Contains(acceptedMediaTypes, providedMediaType) {
+			log.Fatalf("Not an accepted media type: %s", providedMediaType)
 		}
 
-		compare(args[2], args[3], args[4])
+		dump1Path := args[2]
+		dump2Path := args[3]
+
+		compare(dump1Path, dump2Path, providedMediaType)
 	default:
 		log.Fatalf("Unknown command: %s", arg)
 	}
