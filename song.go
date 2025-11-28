@@ -15,6 +15,8 @@ type Song struct {
 	ContentRating string `json:"rating"`      // metadata_items.content_rating
 	Year          int    `json:"year"`        // metadata_items.year
 	Genre         string `json:"genre"`       // metadata_items.tags_genre (nullable)
+	AlbumTitle    string `json:"album_title"` // album_title
+	ArtistName    string `json:"artist_name"` // artist_name
 	Library       string `json:"library"`     // library_sections.name
 	MediaType     string `json:"media_type"`  // derived from library_sections.section_type
 	File          string `json:"file"`        // media_parts.file
@@ -43,6 +45,8 @@ func (s *Song) ToCSV() string {
 		s.Title,
 		strconv.Itoa(s.Year),
 		s.Genre,
+		s.AlbumTitle,
+		s.ArtistName,
 		s.Library,
 		s.MediaType,
 		s.File,
@@ -68,11 +72,10 @@ func (s *Song) ToCSV() string {
 }
 
 func (s *Song) CSVHeaders() string {
-	return "title,year,genre,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
+	return "title,year,genre,album_title,artist_name,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
 }
 
 func getSongs(db *sql.DB) ([]*Song, error) {
-
 	rows, err := db.Query(SONG_DUMP_QUERY)
 	if err != nil {
 		return nil, fmt.Errorf("could not query Songs: " + err.Error())
@@ -82,6 +85,8 @@ func getSongs(db *sql.DB) ([]*Song, error) {
 		Title      string
 		Year       int
 		Genre      string
+		AlbumTitle string
+		ArtistName string
 		Library    string
 		MediaType  string
 		File       string
@@ -101,7 +106,7 @@ func getSongs(db *sql.DB) ([]*Song, error) {
 	}(rows)
 
 	for rows.Next() {
-		err = rows.Scan(&Title, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec)
+		err = rows.Scan(&Title, &Year, &Genre, &AlbumTitle, &ArtistName, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec)
 		if err != nil {
 			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
 		}
@@ -110,6 +115,8 @@ func getSongs(db *sql.DB) ([]*Song, error) {
 			Title:      Title,
 			Year:       Year,
 			Genre:      Genre,
+			AlbumTitle: AlbumTitle,
+			ArtistName: ArtistName,
 			Library:    Library,
 			MediaType:  MediaType,
 			File:       File,
@@ -138,8 +145,8 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 	}(file)
 
 	r := csv.NewReader(file)
-	// We expect exactly 11 columns (see Song.CSVHeaders / Song.ToCSV)
-	r.FieldsPerRecord = 11
+	// We expect exactly 13 columns (see Song.CSVHeaders / Song.ToCSV)
+	r.FieldsPerRecord = 13
 
 	var songs []*Song
 	row := 0
@@ -155,7 +162,7 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 		row++
 
 		// Skip header row if present
-		if row == 1 && len(record) == 11 &&
+		if row == 1 && len(record) == 13 &&
 			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
 			strings.EqualFold(strings.TrimSpace(record[1]), "year") {
 			continue
@@ -180,15 +187,15 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid year on row %d: %w", row, err)
 		}
-		size, err := atoi64(record[7])
+		size, err := atoi64(record[9])
 		if err != nil {
 			return nil, fmt.Errorf("invalid size on row %d: %w", row, err)
 		}
-		duration, err := atoi64(record[8])
+		duration, err := atoi64(record[10])
 		if err != nil {
 			return nil, fmt.Errorf("invalid duration on row %d: %w", row, err)
 		}
-		bitrate, err := atoi(record[9])
+		bitrate, err := atoi(record[11])
 		if err != nil {
 			return nil, fmt.Errorf("invalid bitrate on row %d: %w", row, err)
 		}
@@ -197,14 +204,16 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 			Title:      trim(record[0]),
 			Year:       year,
 			Genre:      trim(record[2]),
-			Library:    trim(record[3]),
-			MediaType:  trim(record[4]),
-			File:       trim(record[5]),
-			Hash:       trim(record[6]),
+			AlbumTitle: trim(record[3]),
+			ArtistName: trim(record[4]),
+			Library:    trim(record[5]),
+			MediaType:  trim(record[6]),
+			File:       trim(record[7]),
+			Hash:       trim(record[8]),
 			Size:       size,
 			Duration:   duration,
 			Bitrate:    bitrate,
-			AudioCodec: trim(record[10]),
+			AudioCodec: trim(record[12]),
 		}
 
 		songs = append(songs, s)
@@ -215,6 +224,6 @@ func getSongsFromCSVFile(path string) ([]*Song, error) {
 
 // GetUniqueTitle Aggregates Title and Year to avoid issues with songs with same title
 func (s *Song) GetUniqueTitle() string {
-	uniqueTitle := fmt.Sprintf("%s %s", s.Title, strconv.Itoa(s.Year))
+	uniqueTitle := fmt.Sprintf("%s %s %s %s", s.Title, s.ArtistName, s.AlbumTitle, strconv.Itoa(s.Year))
 	return uniqueTitle
 }

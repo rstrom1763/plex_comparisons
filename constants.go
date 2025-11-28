@@ -70,28 +70,43 @@ FROM metadata_items
 WHERE section_type = 1;`
 
 const SONG_DUMP_QUERY string = `SELECT
-    metadata_items.title,
-    IFNULL(year,0) AS year,
-    metadata_items.tags_genre AS genre,
-    library_sections.name AS library,
+    metadata_items.title                         AS track_title,
+    COALESCE(metadata_items.year, album.year, 0) AS year,
+    metadata_items.tags_genre                    AS genre,
+    album.title                                  AS album_title,
+    artist.title                                 AS artist_name,
+    library_sections.name                        AS library,
     CASE library_sections.section_type
-        WHEN 1 THEN 'Movie'
-        WHEN 2 THEN 'TV Show'
-        WHEN 8 THEN 'Music'
+        WHEN 1  THEN 'Movie'
+        WHEN 2  THEN 'TV Show'
+        WHEN 8  THEN 'Music'
         WHEN 13 THEN 'Photo'
         ELSE 'Unknown'
-        END AS media_type,
+    END                                          AS media_type,
     media_parts.file,
     media_parts.hash,
     media_parts.size,
-    IFNULL(media_parts.duration,0) AS duration,
-    IFNULL(media_items.bitrate,0) AS bitrate,
+    IFNULL(media_parts.duration, 0)              AS duration,
+    IFNULL(media_items.bitrate, 0)               AS bitrate,
     media_items.audio_codec
 FROM metadata_items
-    JOIN media_items ON media_items.metadata_item_id = metadata_items.id
-    JOIN media_parts ON media_parts.media_item_id = media_items.id
-    JOIN library_sections ON media_items.library_section_id = library_sections.id
-WHERE media_type = 'Music';`
+    JOIN media_items
+        ON media_items.metadata_item_id = metadata_items.id
+    JOIN media_parts
+        ON media_parts.media_item_id = media_items.id
+    JOIN library_sections
+        ON media_items.library_section_id = library_sections.id
+
+    LEFT JOIN metadata_items AS album
+        ON album.id = metadata_items.parent_id
+           AND album.metadata_type = 9
+
+    LEFT JOIN metadata_items AS artist
+        ON artist.id = album.parent_id
+           AND artist.metadata_type = 8
+WHERE
+    library_sections.section_type = 8
+    AND metadata_items.metadata_type = 10;`
 
 const EPISODE_DUMP_QUERY string = `SELECT
     shows.title AS show_title,
