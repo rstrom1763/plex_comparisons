@@ -10,6 +10,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 1
 
     strategy:
       matrix:
@@ -17,18 +19,6 @@ jobs:
           - goos: linux
             arch: amd64
             bin_name: plex_compare-linux-amd64
-          - goos: linux
-            arch: arm64
-            bin_name: plex_compare-linux-arm64
-          - goos: windows
-            arch: amd64
-            bin_name: plex_compare-windows-amd64.exe
-          - goos: darwin
-            arch: amd64
-            bin_name: plex_compare-darwin-amd64
-          - goos: darwin
-            arch: arm64
-            bin_name: plex_compare-darwin-arm64
 
     steps:
       - name: Checkout code
@@ -80,9 +70,5 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: |
             dist/**/plex_compare-linux-amd64
-            dist/**/plex_compare-linux-arm64
-            dist/**/plex_compare-windows-amd64.exe
-            dist/**/plex_compare-darwin-amd64
-            dist/**/plex_compare-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
