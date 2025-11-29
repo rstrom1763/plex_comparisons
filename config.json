@@ -1,8 +1,0 @@
-{
-    "plex_token": "",
-    "plex_server_url": "",
-    "server_url": "",
-    "username": "",
-    "port": "8080",
-    "interval_minutes":"120"
-}
