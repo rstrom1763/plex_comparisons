@@ -250,3 +250,50 @@ func addNoHaveToPath(path string) string {
 	fileExtension := path[strings.LastIndex(path, "."):]
 	return prefix + "_no_have" + fileExtension
 }
+
+func humanReadableByteCountString(bytes int64) string {
+	if bytes <= 0 {
+		return "0 B"
+	}
+
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+
+	div := float64(unit)
+	exp := 0
+	for n := float64(bytes) / div; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+
+	value := float64(bytes) / div
+	units := []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
+
+	if exp >= len(units) {
+		exp = len(units) - 1
+	}
+
+	return fmt.Sprintf("%.2f %s", value, units[exp])
+}
+
+func getByteSumFromDumpFile(dumpPath string, mediaType string) (int64, error) {
+	var byteSum int64
+
+	if !fileExists(dumpPath) {
+		log.Fatalf("%s does not exist", dumpPath)
+	}
+
+	items, err := getMediaItemsFromCSV(dumpPath, mediaType)
+	if err != nil {
+		return 0, fmt.Errorf("could not get media items from csv: %s", err.Error())
+	}
+
+	for _, item := range items {
+		byteSum += item.GetSizeBytes()
+	}
+
+	return byteSum, nil
+
+}

@@ -4,6 +4,7 @@ type Media interface {
 	ToCSV() string
 	CSVHeaders() string
 	GetUniqueTitle() string
+	GetSizeBytes() int64
 }
 
 func toMediaSlice[T Media](media []T) []Media {

@@ -41,49 +41,43 @@ func compareDumps[T Media](dump1 []T, dump2 []T) ([]T, []T) {
 	return dump1NoHave, dump2NoHave
 }
 
-func getMediaItems(path1 string, path2 string, mediaType string) ([]Media, []Media, error) {
+func getMediaItemsFromCSV(path1 string, mediaType string) ([]Media, error) {
 
 	switch mediaType {
 	case "movie":
-		mediaList1, err := getMoviesFromCSVFile(path1)
+		mediaList, err := getMoviesFromCSVFile(path1)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		mediaList2, err := getMoviesFromCSVFile(path2)
-		if err != nil {
-			return nil, nil, err
-		}
-		return toMediaSlice(mediaList1), toMediaSlice(mediaList2), nil
+		return toMediaSlice(mediaList), nil
 	case "show":
-		mediaList1, err := getEpisodesFromCSVFile(path1)
+		mediaList, err := getEpisodesFromCSVFile(path1)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		mediaList2, err := getEpisodesFromCSVFile(path2)
-		if err != nil {
-			return nil, nil, err
-		}
-		return toMediaSlice(mediaList1), toMediaSlice(mediaList2), nil
+		return toMediaSlice(mediaList), nil
 	case "song":
-		mediaList1, err := getSongsFromCSVFile(path1)
+		mediaList, err := getSongsFromCSVFile(path1)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		mediaList2, err := getSongsFromCSVFile(path2)
-		if err != nil {
-			return nil, nil, err
-		}
-		return toMediaSlice(mediaList1), toMediaSlice(mediaList2), nil
+		return toMediaSlice(mediaList), nil
 	}
 
-	return nil, nil, fmt.Errorf("unknown media type: %s", mediaType)
+	return nil, fmt.Errorf("unknown media type: %s", mediaType)
 }
 
 func compare(dumpFilePath1 string, dumpFilePath2 string, mediaType string) {
-	mediaItems1, mediaItems2, err := getMediaItems(dumpFilePath1, dumpFilePath2, mediaType)
+	mediaItems1, err := getMediaItemsFromCSV(dumpFilePath1, mediaType)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("could not get Media items from csv: %s", err.Error())
 	}
+
+	mediaItems2, err := getMediaItemsFromCSV(dumpFilePath2, mediaType)
+	if err != nil {
+		log.Fatalf("could not get Media items from csv: %s", err.Error())
+	}
+
 	dump1NoHave, dump2NoHave := compareDumps(mediaItems1, mediaItems2)
 
 	err = writeCSV(addNoHaveToPath(dumpFilePath1), dump1NoHave)

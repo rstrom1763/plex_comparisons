@@ -41,6 +41,10 @@ func (e *Episode) GetYear() int {
 	return e.Year
 }
 
+func (e *Episode) GetSizeBytes() int64 {
+	return e.Size
+}
+
 func (e *Episode) ToCSV() string {
 	fields := []string{
 		e.ShowTitle,
@@ -264,4 +268,8 @@ func getEpisodesFromCSVFile(path string) ([]*Episode, error) {
 func (e *Episode) GetUniqueTitle() string {
 	uniqueTitle := fmt.Sprintf("%s %d %s %d", e.ShowTitle, e.SeasonNumber, e.EpisodeTitle, e.Year)
 	return uniqueTitle
+}
+
+func (e *Episode) GetShowUniqueTitle() string {
+	return fmt.Sprintf("%s %d", e.ShowTitle, e.Year)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"slices"
@@ -51,6 +52,23 @@ func main() {
 		}
 
 		compare(dump1Path, dump2Path, providedMediaType)
+	case "byteSum":
+		if len(args) != 4 {
+			log.Fatalf("Expected 3 arguments, got %d", len(args)-1)
+		}
+
+		dumpPath := args[2]
+		mediaType := args[3]
+
+		byteCount, err := getByteSumFromDumpFile(dumpPath, mediaType)
+		if err != nil {
+			log.Fatalf("There was an error calculating the byte sum: %s", err)
+		}
+
+		byteCountString := humanReadableByteCountString(byteCount)
+
+		fmt.Printf("Bytes: %s\n", byteCountString)
+
 	default:
 		log.Fatalf("Unknown command: %s", arg)
 	}

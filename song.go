@@ -40,6 +40,10 @@ func (s *Song) GetYear() int {
 	return s.Year
 }
 
+func (s *Song) GetSizeBytes() int64 {
+	return s.Size
+}
+
 func (s *Song) ToCSV() string {
 	fields := []string{
 		s.Title,

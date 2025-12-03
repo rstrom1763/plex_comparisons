@@ -38,6 +38,10 @@ func (m *Movie) GetYear() int {
 	return m.Year
 }
 
+func (m *Movie) GetSizeBytes() int64 {
+	return m.Size
+}
+
 func (m *Movie) ToCSV() string {
 	fields := []string{
 		m.Title,
