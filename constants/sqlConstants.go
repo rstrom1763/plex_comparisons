@@ -1,6 +1,4 @@
-package main
-
-const DOTENV_PATH = ".env"
+package constants
 
 const MOVIE_DUMP_QUERY string = `SELECT
     metadata_items.title,

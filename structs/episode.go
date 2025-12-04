@@ -1,4 +1,4 @@
-package main
+package structs
 
 import (
 	"database/sql"
@@ -9,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	. "github.com/rstrom1763/plex_comparisons/constants"
 )
 
 type Episode struct {
@@ -82,7 +84,7 @@ func (e *Episode) CSVHeaders() string {
 	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
 }
 
-func getEpisodes(db *sql.DB) ([]*Episode, error) {
+func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 	rows, err := db.Query(EPISODE_DUMP_QUERY)
 	if err != nil {
 		return nil, fmt.Errorf("could not query Episodes: %w", err)
@@ -153,7 +155,7 @@ func getEpisodes(db *sql.DB) ([]*Episode, error) {
 	return episodes, nil
 }
 
-func getEpisodesFromCSVFile(path string) ([]*Episode, error) {
+func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open csv file")

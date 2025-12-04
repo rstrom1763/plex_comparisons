@@ -1,4 +1,4 @@
-package main
+package structs
 
 type Media interface {
 	ToCSV() string
@@ -7,7 +7,7 @@ type Media interface {
 	GetSizeBytes() int64
 }
 
-func toMediaSlice[T Media](media []T) []Media {
+func ToMediaSlice[T Media](media []T) []Media {
 	result := make([]Media, len(media))
 	for i, _ := range media {
 		result[i] = media[i]

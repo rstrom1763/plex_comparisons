@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+
+	. "github.com/rstrom1763/plex_comparisons/structs"
 )
 
 func findNotIn[T Media](items []T, otherDumpItemsMap map[string]T) []T {
@@ -45,23 +47,23 @@ func getMediaItemsFromCSV(path1 string, mediaType string) ([]Media, error) {
 
 	switch mediaType {
 	case "movie":
-		mediaList, err := getMoviesFromCSVFile(path1)
+		mediaList, err := GetMoviesFromCSVFile(path1)
 		if err != nil {
 			return nil, err
 		}
-		return toMediaSlice(mediaList), nil
+		return ToMediaSlice(mediaList), nil
 	case "show":
-		mediaList, err := getEpisodesFromCSVFile(path1)
+		mediaList, err := GetEpisodesFromCSVFile(path1)
 		if err != nil {
 			return nil, err
 		}
-		return toMediaSlice(mediaList), nil
+		return ToMediaSlice(mediaList), nil
 	case "song":
-		mediaList, err := getSongsFromCSVFile(path1)
+		mediaList, err := GetSongsFromCSVFile(path1)
 		if err != nil {
 			return nil, err
 		}
-		return toMediaSlice(mediaList), nil
+		return ToMediaSlice(mediaList), nil
 	}
 
 	return nil, fmt.Errorf("unknown media type: %s", mediaType)

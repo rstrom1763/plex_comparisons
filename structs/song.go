@@ -1,4 +1,4 @@
-package main
+package structs
 
 import (
 	"database/sql"
@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	. "github.com/rstrom1763/plex_comparisons/constants"
 )
 
 type Song struct {
@@ -79,7 +81,7 @@ func (s *Song) CSVHeaders() string {
 	return "title,year,genre,album_title,artist_name,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
 }
 
-func getSongs(db *sql.DB) ([]*Song, error) {
+func GetSongs(db *sql.DB) ([]*Song, error) {
 	rows, err := db.Query(SONG_DUMP_QUERY)
 	if err != nil {
 		return nil, fmt.Errorf("could not query Songs: " + err.Error())
@@ -137,7 +139,7 @@ func getSongs(db *sql.DB) ([]*Song, error) {
 	return Songs, nil
 }
 
-func getSongsFromCSVFile(path string) ([]*Song, error) {
+func GetSongsFromCSVFile(path string) ([]*Song, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not open csv file")

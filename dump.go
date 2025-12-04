@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
+	. "github.com/rstrom1763/plex_comparisons/structs"
 )
 
 func dump(plexDbPath string) error {
@@ -24,7 +25,7 @@ func dump(plexDbPath string) error {
 		}
 	}(db)
 
-	movies, err := getMovies(db)
+	movies, err := GetMovies(db)
 	if err != nil {
 		return fmt.Errorf("could not fetch movies from DB: %v", err.Error())
 	}
@@ -34,7 +35,7 @@ func dump(plexDbPath string) error {
 		return fmt.Errorf("error writing movies dump: " + err.Error())
 	}
 
-	songs, err := getSongs(db)
+	songs, err := GetSongs(db)
 	if err != nil {
 		return fmt.Errorf("could not fetch songs from DB: %v", err.Error())
 	}
@@ -44,7 +45,7 @@ func dump(plexDbPath string) error {
 		return fmt.Errorf("error writing songs dump: " + err.Error())
 	}
 
-	episodes, err := getEpisodes(db)
+	episodes, err := GetEpisodes(db)
 	if err != nil {
 		return fmt.Errorf("could not fetch episodes from DB: %v", err.Error())
 	}

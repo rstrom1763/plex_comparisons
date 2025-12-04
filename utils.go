@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	. "github.com/rstrom1763/plex_comparisons/constants"
 )
 
 func compressData(data []byte) []byte {

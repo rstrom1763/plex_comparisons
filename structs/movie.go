@@ -1,4 +1,4 @@
-package main
+package structs
 
 import (
 	"database/sql"
@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	. "github.com/rstrom1763/plex_comparisons/constants"
 )
 
 type Movie struct {
@@ -81,7 +83,7 @@ func (m *Movie) CSVHeaders() string {
 	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
 }
 
-func getMovies(db *sql.DB) ([]*Movie, error) {
+func GetMovies(db *sql.DB) ([]*Movie, error) {
 
 	rows, err := db.Query(MOVIE_DUMP_QUERY)
 	if err != nil {
@@ -148,7 +150,7 @@ func getMovies(db *sql.DB) ([]*Movie, error) {
 	return movies, nil
 }
 
-func getMoviesFromCSVFile(path string) ([]*Movie, error) {
+func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 
 	file, err := os.Open(path)
 	if err != nil {
