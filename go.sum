@@ -2,3 +2,5 @@ github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/mattn/go-sqlite3 v1.14.32 h1:JD12Ag3oLy1zQA+BNn74xRgaBbdhbNIDYvQUEuuErjs=
 github.com/mattn/go-sqlite3 v1.14.32/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
+github.com/rstrom1763/goUtils v0.0.0-20251213053853-7b6e811eb209 h1:gr8vjQgozmeJWVlCo/l8nSQ/Frb0PLeGBnv5E7E02KI=
+github.com/rstrom1763/goUtils v0.0.0-20251213053853-7b6e811eb209/go.mod h1:uA8E1R4y4vWaEd6dVCqYTPmGFZ4RXJ92R7SDkcp5ZHc=

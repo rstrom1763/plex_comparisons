@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"slices"
+
+	utils "github.com/rstrom1763/goUtils"
 )
 
 func main() {
@@ -44,10 +46,10 @@ func main() {
 		dump1Path := args[2]
 		dump2Path := args[3]
 
-		if !fileExists(dump1Path) {
+		if !utils.FileExists(dump1Path) {
 			log.Fatalf("%s does not exist", dump1Path)
 		}
-		if !fileExists(dump2Path) {
+		if !utils.FileExists(dump2Path) {
 			log.Fatalf("%s does not exist", dump2Path)
 		}
 
@@ -65,7 +67,7 @@ func main() {
 			log.Fatalf("There was an error calculating the byte sum: %s", err)
 		}
 
-		byteCountString := humanReadableByteCountString(byteCount)
+		byteCountString := utils.HumanReadableByteCountString(byteCount)
 
 		fmt.Printf("Bytes: %s\n", byteCountString)
 
