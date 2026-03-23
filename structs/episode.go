@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -14,25 +15,27 @@ import (
 )
 
 type Episode struct {
-	ShowTitle     string `json:"show_title"`
-	SeasonNumber  int    `json:"season_number"`
-	EpisodeNumber int    `json:"episode_number"`
-	EpisodeTitle  string `json:"episode_title"`
-	ContentRating string `json:"rating"`
-	Year          int    `json:"year"`
-	Library       string `json:"library"`
-	MediaType     string `json:"media_type"`
-	File          string `json:"file"`
-	Hash          string `json:"hash"`
-	Size          int64  `json:"size"`
-	Duration      int64  `json:"duration"`
-	Container     string `json:"container"`
-	Bitrate       int    `json:"bitrate"`
-	VideoCodec    string `json:"video_codec"`
-	Height        int    `json:"height"`
-	Width         int    `json:"width"`
-	Resolution    string `json:"resolution"`
-	AudioCodec    string `json:"audio_codec"`
+	ShowTitle      string  `json:"show_title"`
+	SeasonNumber   int     `json:"season_number"`
+	EpisodeNumber  int     `json:"episode_number"`
+	EpisodeTitle   string  `json:"episode_title"`
+	ContentRating  string  `json:"rating"`
+	Year           int     `json:"year"`
+	Library        string  `json:"library"`
+	MediaType      string  `json:"media_type"`
+	File           string  `json:"file"`
+	Hash           string  `json:"hash"`
+	Size           int64   `json:"size"`
+	Duration       int64   `json:"duration"`
+	Container      string  `json:"container"`
+	Bitrate        int     `json:"bitrate"`
+	VideoCodec     string  `json:"video_codec"`
+	Height         int     `json:"height"`
+	Width          int     `json:"width"`
+	Resolution     string  `json:"resolution"`
+	AudioCodec     string  `json:"audio_codec"`
+	CriticRating   float64 `json:"critic_rating"`
+	AudienceRating float64 `json:"audience_rating"`
 }
 
 func (e *Episode) GetTitle() string {
@@ -68,6 +71,8 @@ func (e *Episode) ToCSV() string {
 		strconv.Itoa(e.Width),
 		e.Resolution,
 		e.AudioCodec,
+		strconv.FormatFloat(e.CriticRating, 'f', 1, 64),
+		strconv.FormatFloat(e.AudienceRating, 'f', 1, 64),
 	}
 
 	for i, field := range fields {
@@ -81,7 +86,7 @@ func (e *Episode) ToCSV() string {
 }
 
 func (e *Episode) CSVHeaders() string {
-	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
+	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating\n"
 }
 
 func GetEpisodes(db *sql.DB) ([]*Episode, error) {
@@ -98,56 +103,61 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 	var episodes []*Episode
 	for rows.Next() {
 		var (
-			ShowTitle     string
-			SeasonNumber  int
-			EpisodeNumber int
-			EpisodeTitle  string
-			ContentRating string
-			Year          int
-			Library       string
-			MediaType     string
-			File          string
-			Hash          string
-			Size          int64
-			Duration      int64
-			Container     string
-			Bitrate       int
-			VideoCodec    string
-			Height        int
-			Width         int
-			Resolution    string
-			AudioCodec    string
+			ShowTitle      string
+			SeasonNumber   int
+			EpisodeNumber  int
+			EpisodeTitle   string
+			ContentRating  string
+			Year           int
+			Library        string
+			MediaType      string
+			File           string
+			Hash           string
+			Size           int64
+			Duration       int64
+			Container      string
+			Bitrate        int
+			VideoCodec     string
+			Height         int
+			Width          int
+			Resolution     string
+			AudioCodec     string
+			CriticRating   float64
+			AudienceRating float64
 		)
 
 		err = rows.Scan(
 			&ShowTitle, &SeasonNumber, &EpisodeNumber, &EpisodeTitle, &ContentRating,
 			&Year, &Library, &MediaType, &File, &Hash, &Size, &Duration,
 			&Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec,
+			&CriticRating, &AudienceRating,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning row: %w", err)
 		}
 
 		e := &Episode{
-			ShowTitle:     ShowTitle,
-			SeasonNumber:  SeasonNumber,
-			EpisodeNumber: EpisodeNumber,
-			EpisodeTitle:  EpisodeTitle,
-			ContentRating: ContentRating,
-			Year:          Year,
-			Library:       Library,
-			MediaType:     MediaType,
-			File:          File,
-			Hash:          Hash,
-			Size:          Size,
-			Duration:      Duration,
-			Container:     Container,
-			Bitrate:       Bitrate,
-			VideoCodec:    VideoCodec,
-			Height:        Height,
-			Width:         Width,
-			Resolution:    Resolution,
-			AudioCodec:    AudioCodec,
+			ShowTitle:      ShowTitle,
+			SeasonNumber:   SeasonNumber,
+			EpisodeNumber:  EpisodeNumber,
+			EpisodeTitle:   EpisodeTitle,
+			ContentRating:  ContentRating,
+			Year:           Year,
+			Library:        Library,
+			MediaType:      MediaType,
+			File:           File,
+			Hash:           Hash,
+			Size:           Size,
+			Duration:       Duration,
+			Container:      Container,
+			Bitrate:        Bitrate,
+			VideoCodec:     VideoCodec,
+			Height:         Height,
+			Width:          Width,
+			Resolution:     Resolution,
+			AudioCodec:     AudioCodec,
+			CriticRating:   math.Round(float64(CriticRating)*10) / 10,
+			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
 		}
 		episodes = append(episodes, e)
 	}
@@ -167,8 +177,8 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 	}()
 
 	r := csv.NewReader(f)
-	// Expect exactly 19 columns (see Episode.CSVHeaders / Episode.ToCSV)
-	r.FieldsPerRecord = 19
+	// Expect exactly 21 columns (see Episode.CSVHeaders / Episode.ToCSV)
+	r.FieldsPerRecord = 21
 
 	var episodes []*Episode
 	row := 0
@@ -186,6 +196,12 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		}
 		return strconv.ParseInt(s, 10, 64)
 	}
+	atof := func(s string) (float64, error) {
+		if s = trim(s); s == "" {
+			return 0, nil
+		}
+		return strconv.ParseFloat(s, 64)
+	}
 
 	for {
 		rec, err := r.Read()
@@ -198,7 +214,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		row++
 
 		// Skip header row if present
-		if row == 1 && len(rec) == 19 &&
+		if row == 1 && len(rec) == 21 &&
 			strings.EqualFold(trim(rec[0]), "show_title") &&
 			strings.EqualFold(trim(rec[1]), "season_number") &&
 			strings.EqualFold(trim(rec[2]), "episode_number") {
@@ -237,27 +253,37 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid width on row %d: %w", row, err)
 		}
+		criticRating, err := atof(rec[19])
+		if err != nil {
+			return nil, fmt.Errorf("invalid critic_rating on row %d: %w", row, err)
+		}
+		audienceRating, err := atof(rec[20])
+		if err != nil {
+			return nil, fmt.Errorf("invalid audience_rating on row %d: %w", row, err)
+		}
 
 		e := &Episode{
-			ShowTitle:     trim(rec[0]),
-			SeasonNumber:  season,
-			EpisodeNumber: epNum,
-			EpisodeTitle:  trim(rec[3]),
-			ContentRating: trim(rec[4]),
-			Year:          year,
-			Library:       trim(rec[6]),
-			MediaType:     trim(rec[7]),
-			File:          trim(rec[8]),
-			Hash:          trim(rec[9]),
-			Size:          size,
-			Duration:      duration,
-			Container:     trim(rec[12]),
-			Bitrate:       bitrate,
-			VideoCodec:    trim(rec[14]),
-			Height:        height,
-			Width:         width,
-			Resolution:    trim(rec[17]),
-			AudioCodec:    trim(rec[18]),
+			ShowTitle:      trim(rec[0]),
+			SeasonNumber:   season,
+			EpisodeNumber:  epNum,
+			EpisodeTitle:   trim(rec[3]),
+			ContentRating:  trim(rec[4]),
+			Year:           year,
+			Library:        trim(rec[6]),
+			MediaType:      trim(rec[7]),
+			File:           trim(rec[8]),
+			Hash:           trim(rec[9]),
+			Size:           size,
+			Duration:       duration,
+			Container:      trim(rec[12]),
+			Bitrate:        bitrate,
+			VideoCodec:     trim(rec[14]),
+			Height:         height,
+			Width:          width,
+			Resolution:     trim(rec[17]),
+			AudioCodec:     trim(rec[18]),
+			CriticRating:   math.Round(criticRating*10) / 10,
+			AudienceRating: math.Round(audienceRating*10) / 10,
 		}
 
 		episodes = append(episodes, e)

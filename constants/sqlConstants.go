@@ -25,7 +25,9 @@ const MOVIE_DUMP_QUERY string = `SELECT
         WHEN width <= 2048 THEN '1080p'
         WHEN width <= 2560 THEN '1440p'
         ELSE '4K' END AS resolution,
-    media_items.audio_codec
+    media_items.audio_codec,
+    IFNULL(metadata_items.rating,0) AS critic_rating,
+    IFNULL(metadata_items.audience_rating,0) AS audience_rating
 FROM metadata_items
     JOIN media_items ON media_items.metadata_item_id = metadata_items.id
     JOIN media_parts ON media_parts.media_item_id = media_items.id
@@ -102,7 +104,9 @@ const EPISODE_DUMP_QUERY string = `SELECT
         WHEN width <= 2048 THEN '1080p'
         WHEN width <= 2560 THEN '1440p'
         ELSE '4K' END AS resolution,
-    media_items.audio_codec
+    media_items.audio_codec,
+    IFNULL(shows.rating,0) AS critic_rating,
+    IFNULL(shows.audience_rating,0) AS audience_rating
 FROM metadata_items AS episodes
     JOIN metadata_items AS seasons ON episodes.parent_id = seasons.id
     JOIN metadata_items AS shows ON seasons.parent_id = shows.id

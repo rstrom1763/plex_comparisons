@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -13,23 +14,25 @@ import (
 )
 
 type Movie struct {
-	Title         string `json:"title"`       // metadata_items.title
-	ContentRating string `json:"rating"`      // metadata_items.content_rating
-	Year          int    `json:"year"`        // metadata_items.year
-	Genre         string `json:"genre"`       // metadata_items.tags_genre (nullable)
-	Library       string `json:"library"`     // library_sections.name
-	MediaType     string `json:"media_type"`  // derived from library_sections.section_type
-	File          string `json:"file"`        // media_parts.file
-	Hash          string `json:"hash"`        // media_parts.hash
-	Size          int64  `json:"size"`        // media_parts.size
-	Duration      int64  `json:"duration"`    // media_parts.duration
-	Container     string `json:"container"`   // media_items.container
-	Bitrate       int    `json:"bitrate"`     // media_items.bitrate
-	VideoCodec    string `json:"video_codec"` // media_items.video_codec
-	Height        int    `json:"height"`      // media_items.height
-	Width         int    `json:"width"`       // media_items.width
-	Resolution    string `json:"resolution"`  // derived based on width
-	AudioCodec    string `json:"audio_codec"` // media_items.audio_codec
+	Title          string  `json:"title"`           // metadata_items.title
+	ContentRating  string  `json:"rating"`          // metadata_items.content_rating
+	Year           int     `json:"year"`            // metadata_items.year
+	Genre          string  `json:"genre"`           // metadata_items.tags_genre (nullable)
+	Library        string  `json:"library"`         // library_sections.name
+	MediaType      string  `json:"media_type"`      // derived from library_sections.section_type
+	File           string  `json:"file"`            // media_parts.file
+	Hash           string  `json:"hash"`            // media_parts.hash
+	Size           int64   `json:"size"`            // media_parts.size
+	Duration       int64   `json:"duration"`        // media_parts.duration
+	Container      string  `json:"container"`       // media_items.container
+	Bitrate        int     `json:"bitrate"`         // media_items.bitrate
+	VideoCodec     string  `json:"video_codec"`     // media_items.video_codec
+	Height         int     `json:"height"`          // media_items.height
+	Width          int     `json:"width"`           // media_items.width
+	Resolution     string  `json:"resolution"`      // derived based on width
+	AudioCodec     string  `json:"audio_codec"`     // media_items.audio_codec
+	CriticRating   float64 `json:"critic_rating"`   // metadata_items.rating
+	AudienceRating float64 `json:"audience_rating"` // metadata_items.audience_rating
 }
 
 func (m *Movie) GetTitle() string {
@@ -63,6 +66,8 @@ func (m *Movie) ToCSV() string {
 		strconv.Itoa(m.Width),
 		m.Resolution,
 		m.AudioCodec,
+		strconv.FormatFloat(m.CriticRating, 'f', 1, 64),
+		strconv.FormatFloat(m.AudienceRating, 'f', 1, 64),
 	}
 
 	// Escape commas or quotes by wrapping each field in quotes if necessary
@@ -80,7 +85,7 @@ func (m *Movie) ToCSV() string {
 }
 
 func (m *Movie) CSVHeaders() string {
-	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec\n"
+	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating\n"
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
@@ -91,23 +96,25 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 	}
 
 	var (
-		Title         string
-		ContentRating string
-		Year          int
-		Genre         string
-		Library       string
-		MediaType     string
-		File          string
-		Hash          string
-		Size          int64
-		Duration      int64
-		Container     string
-		Bitrate       int
-		VideoCodec    string
-		Height        int
-		Width         int
-		Resolution    string
-		AudioCodec    string
+		Title          string
+		ContentRating  string
+		Year           int
+		Genre          string
+		Library        string
+		MediaType      string
+		File           string
+		Hash           string
+		Size           int64
+		Duration       int64
+		Container      string
+		Bitrate        int
+		VideoCodec     string
+		Height         int
+		Width          int
+		Resolution     string
+		AudioCodec     string
+		CriticRating   float64
+		AudienceRating float64
 	)
 	var movies []*Movie
 
@@ -119,29 +126,31 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 	}(rows)
 
 	for rows.Next() {
-		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec)
+		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec, &CriticRating, &AudienceRating)
 		if err != nil {
 			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
 		}
 
 		movie := Movie{
-			Title:         Title,
-			ContentRating: ContentRating,
-			Year:          Year,
-			Genre:         Genre,
-			Library:       Library,
-			MediaType:     MediaType,
-			File:          File,
-			Hash:          Hash,
-			Size:          Size,
-			Duration:      Duration,
-			Container:     Container,
-			Bitrate:       Bitrate,
-			VideoCodec:    VideoCodec,
-			Height:        Height,
-			Width:         Width,
-			Resolution:    Resolution,
-			AudioCodec:    AudioCodec,
+			Title:          Title,
+			ContentRating:  ContentRating,
+			Year:           Year,
+			Genre:          Genre,
+			Library:        Library,
+			MediaType:      MediaType,
+			File:           File,
+			Hash:           Hash,
+			Size:           Size,
+			Duration:       Duration,
+			Container:      Container,
+			Bitrate:        Bitrate,
+			VideoCodec:     VideoCodec,
+			Height:         Height,
+			Width:          Width,
+			Resolution:     Resolution,
+			AudioCodec:     AudioCodec,
+			CriticRating:   math.Round(float64(CriticRating)*10) / 10,
+			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
 		}
 
 		movies = append(movies, &movie)
@@ -165,7 +174,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 	}(file)
 
 	csvReader := csv.NewReader(file)
-	csvReader.FieldsPerRecord = 17
+	csvReader.FieldsPerRecord = 19
 
 	var movies []*Movie
 	row := 0
@@ -181,7 +190,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 		row++
 
 		// Skip header row
-		if row == 1 && len(record) == 17 &&
+		if row == 1 && len(record) == 19 &&
 			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
 			strings.EqualFold(strings.TrimSpace(record[1]), "rating") {
 			continue
@@ -200,6 +209,13 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 				return 0, nil
 			}
 			return strconv.ParseInt(s, 10, 64)
+		}
+
+		atof := func(s string) (float64, error) {
+			if s = trim(s); s == "" {
+				return 0, nil
+			}
+			return strconv.ParseFloat(s, 64)
 		}
 
 		year, err := atoi(record[2])
@@ -226,25 +242,35 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid width on row %d: %w", row, err)
 		}
+		criticRating, err := atof(record[17])
+		if err != nil {
+			return nil, fmt.Errorf("invalid critic_rating on row %d: %w", row, err)
+		}
+		audienceRating, err := atof(record[18])
+		if err != nil {
+			return nil, fmt.Errorf("invalid audience_rating on row %d: %w", row, err)
+		}
 
 		movie := &Movie{
-			Title:         trim(record[0]),
-			ContentRating: trim(record[1]),
-			Year:          year,
-			Genre:         trim(record[3]),
-			Library:       trim(record[4]),
-			MediaType:     trim(record[5]),
-			File:          trim(record[6]),
-			Hash:          trim(record[7]),
-			Size:          size,
-			Duration:      duration,
-			Container:     trim(record[10]),
-			Bitrate:       bitrate,
-			VideoCodec:    trim(record[12]),
-			Height:        height,
-			Width:         width,
-			Resolution:    trim(record[15]),
-			AudioCodec:    trim(record[16]),
+			Title:          trim(record[0]),
+			ContentRating:  trim(record[1]),
+			Year:           year,
+			Genre:          trim(record[3]),
+			Library:        trim(record[4]),
+			MediaType:      trim(record[5]),
+			File:           trim(record[6]),
+			Hash:           trim(record[7]),
+			Size:           size,
+			Duration:       duration,
+			Container:      trim(record[10]),
+			Bitrate:        bitrate,
+			VideoCodec:     trim(record[12]),
+			Height:         height,
+			Width:          width,
+			Resolution:     trim(record[15]),
+			AudioCodec:     trim(record[16]),
+			CriticRating:   math.Round(criticRating*10) / 10,
+			AudienceRating: math.Round(audienceRating*10) / 10,
 		}
 
 		movies = append(movies, movie)
