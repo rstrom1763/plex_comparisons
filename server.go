@@ -107,6 +107,35 @@ func StartServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
+	r.GET("/dump/songs", func(c *gin.Context) {
+		songs, err := structs.GetSongs(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		jsonData, err := json.Marshal(songs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "could not marshal songs: " + err.Error(),
+			})
+			return
+		}
+
+		compressedData := utils.GzipData(jsonData)
+		if compressedData == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "could not gzip songs data",
+			})
+			return
+		}
+
+		c.Header("Content-Encoding", "gzip")
+		c.Data(http.StatusOK, "application/json", compressedData)
+	})
+
 	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port
 	if protocol == "http" {                                        //Start running the Gin server
 		err = r.Run(":" + port)
