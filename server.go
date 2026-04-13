@@ -42,6 +42,7 @@ func StartServer() error {
 		utils.GenerateSSL()
 	}
 
+	gin.SetMode(gin.ReleaseMode) // Turn off debugging mode
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {
