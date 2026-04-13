@@ -15,7 +15,7 @@ import (
 	"github.com/rstrom1763/plex_comparisons/structs"
 )
 
-func StartServer() error {
+func RunServer() error {
 
 	err := godotenv.Load(constants.DOTENV_PATH)
 	if err != nil {
