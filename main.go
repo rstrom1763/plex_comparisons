@@ -72,7 +72,7 @@ func main() {
 		fmt.Printf("Bytes: %s\n", byteCountString)
 
 	case "server":
-		StartServer()
+		RunServer()
 
 	default:
 		log.Fatalf("Unknown command: %s", arg)
