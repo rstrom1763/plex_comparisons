@@ -11,12 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	utils "github.com/rstrom1763/goUtils"
+	"github.com/rstrom1763/plex_comparisons/constants"
 	"github.com/rstrom1763/plex_comparisons/structs"
 )
 
 func StartServer() error {
 
-	err := godotenv.Load(".env")
+	err := godotenv.Load(constants.DOTENV_PATH)
 	if err != nil {
 		return fmt.Errorf("could not load .env: %s", err.Error())
 	}
