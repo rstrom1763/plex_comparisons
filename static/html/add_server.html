@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Servers</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav>
+        <a href="/movies/gallery">← Back to Gallery</a>
+        <a href="/compare">Go to Comparison</a>
+    </nav>
+    <h1>Manage Remote Servers</h1>
+
+    <div class="content-block">
+        <h3>Add Server</h3>
+        <form id="add-server-form" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <input type="text" id="server-name" placeholder="Server Name" required>
+            <input type="text" id="server-address" placeholder="http://192.168.1.100:8080" required>
+            <button type="submit" class="btn btn-primary">Add Server</button>
+        </form>
+
+        <h3 style="margin-top: 40px;">Registered Servers</h3>
+        <ul id="server-list" class="server-list">
+            <!-- Servers will be listed here -->
+        </ul>
+    </div>
+
+    <script src="/static/js/add_server.js" type="module"></script>
+</body>
+</html>

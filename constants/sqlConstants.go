@@ -120,3 +120,16 @@ WHERE episodes.metadata_type = 4
   AND seasons.metadata_type = 3
   AND shows.metadata_type = 2
 ORDER BY show_title, season_number, episode_number;`
+
+const CREATE_SERVERS_TABLE string = `
+CREATE TABLE IF NOT EXISTS servers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL UNIQUE,
+    token TEXT
+);`
+
+const INSERT_SERVER string = `INSERT INTO servers (name, address, token) VALUES (?, ?, ?);`
+const SELECT_ALL_SERVERS string = `SELECT id, name, address, token FROM servers;`
+const DELETE_SERVER string = `DELETE FROM servers WHERE id = ?;`
+const UPDATE_SERVER string = `UPDATE servers SET name = ?, address = ?, token = ? WHERE id = ?;`

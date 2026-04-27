@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Servers</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav>
+        <a href="/movies/gallery">← Back to Gallery</a>
+        <a href="/add-server">Manage Servers</a>
+    </nav>
+    <h1>Server Comparison</h1>
+
+    <div class="content-block comparison-header">
+        <label for="server-selector">Select Remote Server:</label>
+        <select id="server-selector">
+            <option value="">-- Choose a Server --</option>
+        </select>
+        <button id="compare-btn" class="btn btn-primary">Compare</button>
+    </div>
+
+    <div id="comparison-view" style="display: none;">
+        <h2 id="comparing-with-title">Comparing with...</h2>
+        <div class="content-block">
+            <h3>Available on Remote Server (But Missing Locally)</h3>
+            <div id="remote-only-list" class="gallery">
+                <!-- Remote only movies -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/compare.js" type="module"></script>
+</body>
+</html>

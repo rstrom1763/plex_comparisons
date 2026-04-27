@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -8,10 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	utils "github.com/rstrom1763/goUtils"
+	"github.com/rstrom1763/plex_comparisons/DAOS"
 	"github.com/rstrom1763/plex_comparisons/constants"
 	"github.com/rstrom1763/plex_comparisons/structs"
 )
@@ -27,6 +30,18 @@ func RunServer() error {
 	protocol := os.Getenv("PROTOCOL")
 	plexDbPath := os.Getenv("PLEX_DB_PATH")
 	plexDataPath := os.Getenv("PLEX_DATA_PATH")
+	localDbPath := os.Getenv("LOCAL_DB_PATH")
+	if localDbPath == "" {
+		localDbPath = "./local_state.db"
+	}
+
+	localDAO, err := DAOS.NewLocalStateDAO(localDbPath)
+	if err != nil {
+		return fmt.Errorf("could not initialize local state DAO: %w", err)
+	}
+	defer func() {
+		_ = localDAO.Close()
+	}()
 
 	plexDB, err := initDB(plexDbPath)
 	if err != nil {
@@ -66,6 +81,27 @@ func RunServer() error {
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "could not marshal movies: " + err.Error(),
+			})
+			return
+		}
+
+		compressedData := utils.GzipData(jsonData)
+		if compressedData == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "could not gzip movies data",
+			})
+			return
+		}
+
+		c.Header("Content-Encoding", "gzip")
+		c.Data(http.StatusOK, "application/json", compressedData)
+	})
+
+	r.GET("/dump/movies", func(c *gin.Context) {
+		jsonData, err := os.ReadFile("./test_movies.json")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "could not read test movies file: " + err.Error(),
 			})
 			return
 		}
@@ -176,6 +212,101 @@ func RunServer() error {
 
 	r.GET("/movies/gallery", func(c *gin.Context) {
 		c.File("./static/html/index.html")
+	})
+
+	r.GET("/compare", func(c *gin.Context) {
+		c.File("./static/html/compare.html")
+	})
+
+	r.GET("/add-server", func(c *gin.Context) {
+		c.File("./static/html/add_server.html")
+	})
+
+	// Local State API
+	r.GET("/api/servers", func(c *gin.Context) {
+		servers, err := localDAO.GetServers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, servers)
+	})
+
+	r.POST("/api/servers", func(c *gin.Context) {
+		var server structs.Server
+		if err := c.ShouldBindJSON(&server); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := localDAO.AddServer(server); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusCreated)
+	})
+
+	r.DELETE("/api/servers/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+		if err := localDAO.DeleteServer(id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
+
+	r.GET("/api/compare/:id", func(c *gin.Context) {
+		// Comparison logic will be triggered here
+		// For now, just a placeholder that fetches the other server's dump
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+		servers, _ := localDAO.GetServers()
+		var target structs.Server
+		for _, s := range servers {
+			if s.ID == id {
+				target = s
+				break
+			}
+		}
+
+		if target.Address == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+			return
+		}
+
+		// Simplified comparison: just return what we have vs what they have
+		localMovies, err := structs.GetMovies(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Disable TLS verification for remote servers
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+		resp, err := client.Get(target.Address + "/test/dump/movies")
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
+			return
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		var remoteMovies []*structs.Movie
+		if err := json.NewDecoder(resp.Body).Decode(&remoteMovies); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode remote dump: " + err.Error()})
+			return
+		}
+
+		remoteOnly, localOnly := compareDumps(localMovies, remoteMovies)
+
+		c.JSON(http.StatusOK, gin.H{
+			"local_only":  localOnly,
+			"remote_only": remoteOnly,
+		})
 	})
 
 	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port

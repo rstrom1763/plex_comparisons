@@ -34,18 +34,16 @@ export function createMovieCard(movie) {
     movieDiv.innerHTML = `
         <img src="/thumb/${movie.metadata_hash}" alt="${movie.title}" loading="lazy">
         <div class="movie-info">
-            <div class="movie-title">${movie.title} (${movie.year})</div>
+            <div class="movie-title">${movie.title} <span style="font-weight: 300; opacity: 0.7; font-size: 0.9em;">(${movie.year})</span></div>
             <div class="metadata-grid">
-                <div class="metadata-label">Rating:</div><div>${movie.rating || 'N/A'}</div>
-                <div class="metadata-label">Genre:</div><div>${movie.genre || 'N/A'}</div>
-                <div class="metadata-label">Resolution:</div><div>${movie.resolution || 'N/A'}</div>
-                <div class="metadata-label">Codec:</div><div>${movie.video_codec || 'N/A'}</div>
-                <div class="metadata-label">Audio:</div><div>${movie.audio_codec || 'N/A'}</div>
-                <div class="metadata-label">Size:</div><div>${formatSize(movie.size)}</div>
-                <div class="metadata-label">Duration:</div><div>${formatDuration(movie.duration)}</div>
-                <div class="metadata-label">Library:</div><div>${movie.library || 'N/A'}</div>
-                <div class="metadata-label">Critic:</div><div>${(movie.critic_rating || 0).toFixed(1)}</div>
-                <div class="metadata-label">Audience:</div><div>${(movie.audience_rating || 0).toFixed(1)}</div>
+                <div class="metadata-label">Rating</div><div>${movie.rating || 'N/A'}</div>
+                <div class="metadata-label">Genre</div><div>${movie.genre || 'N/A'}</div>
+                <div class="metadata-label">Resolution</div><div>${movie.resolution || 'N/A'}</div>
+                <div class="metadata-label">Codec</div><div>${movie.video_codec || 'N/A'}</div>
+                <div class="metadata-label">Size</div><div>${formatSize(movie.size)}</div>
+                <div class="metadata-label">Duration</div><div>${formatDuration(movie.duration)}</div>
+                <div class="metadata-label">Critic</div><div>${(movie.critic_rating || 0).toFixed(1)}</div>
+                <div class="metadata-label">Audience</div><div>${(movie.audience_rating || 0).toFixed(1)}</div>
             </div>
         </div>
     `;
