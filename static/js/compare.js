@@ -43,7 +43,7 @@ async function startComparison() {
         remoteList.innerHTML = '';
 
         if (data.remote_only && data.remote_only.length > 0) {
-            data.remote_only.forEach(m => remoteList.appendChild(createMovieCard(m)));
+            data.remote_only.forEach(m => remoteList.appendChild(createMovieCard(m, id)));
         } else {
             remoteList.innerHTML = '<p>Nothing unique found on the remote server.</p>';
         }

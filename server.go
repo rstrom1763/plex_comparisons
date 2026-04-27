@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +21,10 @@ import (
 )
 
 func RunServer() error {
+	// Ensure thumb_cache directory exists
+	if err := os.MkdirAll("thumb_cache", 0755); err != nil {
+		log.Printf("Warning: could not create thumb_cache directory: %v", err)
+	}
 
 	err := godotenv.Load(constants.DOTENV_PATH)
 	if err != nil {
@@ -185,6 +190,67 @@ func RunServer() error {
 		}
 
 		c.File(posterPath)
+	})
+
+	r.GET("/remote-thumb/:id/:hash", func(c *gin.Context) {
+		idStr := c.Param("id")
+		hash := c.Param("hash")
+		id, _ := strconv.Atoi(idStr)
+
+		if hash == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no hash provided"})
+			return
+		}
+
+		cachePath := filepath.Join("thumb_cache", hash+".jpg")
+		if _, err := os.Stat(cachePath); err == nil {
+			c.File(cachePath)
+			return
+		}
+
+		// Not in cache, fetch from remote
+		servers, _ := localDAO.GetServers()
+		var target structs.Server
+		for _, s := range servers {
+			if s.ID == id {
+				target = s
+				break
+			}
+		}
+
+		if target.Address == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+			return
+		}
+
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+		resp, err := client.Get(target.Address + "/thumb/" + hash)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
+			return
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(resp.StatusCode, gin.H{"error": "remote server returned error"})
+			return
+		}
+
+		thumbData, err := io.ReadAll(resp.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read remote thumbnail"})
+			return
+		}
+
+		// Save to cache
+		_ = os.WriteFile(cachePath, thumbData, 0644)
+
+		c.Data(http.StatusOK, resp.Header.Get("Content-Type"), thumbData)
 	})
 
 	r.Static("/static", "./static")

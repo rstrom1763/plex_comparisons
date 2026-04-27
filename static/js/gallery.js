@@ -27,12 +27,16 @@ export function formatDuration(ms) {
  * @param {Object} movie 
  * @returns {HTMLElement}
  */
-export function createMovieCard(movie) {
+export function createMovieCard(movie, serverId = null) {
     const movieDiv = document.createElement('div');
     movieDiv.className = 'movie';
 
+    const thumbUrl = serverId 
+        ? `/remote-thumb/${serverId}/${movie.metadata_hash}`
+        : `/thumb/${movie.metadata_hash}`;
+
     movieDiv.innerHTML = `
-        <img src="/thumb/${movie.metadata_hash}" alt="${movie.title}" loading="lazy">
+        <img src="${thumbUrl}" alt="${movie.title}" loading="lazy">
         <div class="movie-info">
             <div class="movie-title">${movie.title} <span style="font-weight: 300; opacity: 0.7; font-size: 0.9em;">(${movie.year})</span></div>
             <div class="metadata-grid">
