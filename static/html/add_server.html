@@ -14,11 +14,13 @@
     <h1>Manage Remote Servers</h1>
 
     <div class="content-block">
-        <h3>Add Server</h3>
+        <h3 id="form-title">Add Server</h3>
         <form id="add-server-form" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <input type="hidden" id="server-id">
             <input type="text" id="server-name" placeholder="Server Name" required>
-            <input type="text" id="server-address" placeholder="http://192.168.1.100:8080" required>
-            <button type="submit" class="btn btn-primary">Add Server</button>
+            <input type="text" id="server-address" placeholder="https://192.168.1.100:8080" required>
+            <button type="submit" id="submit-btn" class="btn btn-primary">Add Server</button>
+            <button type="button" id="cancel-edit" class="btn btn-danger" style="display: none;">Cancel</button>
         </form>
 
         <h3 style="margin-top: 40px;">Registered Servers</h3>

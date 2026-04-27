@@ -1,6 +1,8 @@
+let servers = [];
+
 async function fetchServers() {
     const response = await fetch('/api/servers');
-    const servers = await response.json();
+    servers = await response.json();
     const list = document.getElementById('server-list');
     list.innerHTML = '';
     
@@ -9,7 +11,8 @@ async function fetchServers() {
         li.className = 'server-item';
         li.innerHTML = `
             <span><strong>${server.name}</strong> (${server.address})</span>
-            <div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary btn-edit" data-id="${server.id}">Edit</button>
                 <button class="btn btn-danger btn-delete" data-id="${server.id}">Delete</button>
             </div>
         `;
@@ -20,32 +23,65 @@ async function fetchServers() {
     document.querySelectorAll('.btn-delete').forEach(btn => {
         btn.addEventListener('click', () => deleteServer(btn.dataset.id));
     });
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', () => startEdit(btn.dataset.id));
+    });
 }
 
-async function addServer(e) {
+function startEdit(id) {
+    const server = servers.find(s => s.id == id);
+    if (!server) return;
+
+    document.getElementById('form-title').textContent = 'Edit Server';
+    document.getElementById('server-id').value = server.id;
+    document.getElementById('server-name').value = server.name;
+    document.getElementById('server-address').value = server.address;
+    document.getElementById('submit-btn').textContent = 'Update Server';
+    document.getElementById('cancel-edit').style.display = 'inline-block';
+}
+
+function cancelEdit() {
+    document.getElementById('form-title').textContent = 'Add Server';
+    document.getElementById('server-id').value = '';
+    document.getElementById('add-server-form').reset();
+    document.getElementById('submit-btn').textContent = 'Add Server';
+    document.getElementById('cancel-edit').style.display = 'none';
+}
+
+async function handleFormSubmit(e) {
     e.preventDefault();
+    const id = document.getElementById('server-id').value;
     const name = document.getElementById('server-name').value;
     const address = document.getElementById('server-address').value;
 
-    const response = await fetch('/api/servers', {
-        method: 'POST',
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/servers/${id}` : '/api/servers';
+
+    const response = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, address })
     });
 
     if (response.ok) {
-        document.getElementById('add-server-form').reset();
+        cancelEdit();
         fetchServers();
     } else {
-        alert('Failed to add server');
+        alert(`Failed to ${id ? 'update' : 'add'} server`);
     }
 }
 
 async function deleteServer(id) {
     if (!confirm('Are you sure?')) return;
     const response = await fetch(`/api/servers/${id}`, { method: 'DELETE' });
-    if (response.ok) fetchServers();
+    if (response.ok) {
+        if (document.getElementById('server-id').value == id) {
+            cancelEdit();
+        }
+        fetchServers();
+    }
 }
 
-document.getElementById('add-server-form').addEventListener('submit', addServer);
+document.getElementById('add-server-form').addEventListener('submit', handleFormSubmit);
+document.getElementById('cancel-edit').addEventListener('click', cancelEdit);
 document.addEventListener('DOMContentLoaded', fetchServers);

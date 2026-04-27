@@ -300,6 +300,22 @@ func RunServer() error {
 		c.Status(http.StatusNoContent)
 	})
 
+	r.PUT("/api/servers/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+		var server structs.Server
+		if err := c.ShouldBindJSON(&server); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		server.ID = id
+		if err := localDAO.UpdateServer(server); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	})
+
 	r.GET("/api/compare/:id", func(c *gin.Context) {
 		// Comparison logic will be triggered here
 		// For now, just a placeholder that fetches the other server's dump
