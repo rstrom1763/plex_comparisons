@@ -14,11 +14,30 @@
     <h1>Server Comparison</h1>
 
     <div class="content-block comparison-header">
-        <label for="server-selector">Select Remote Server:</label>
-        <select id="server-selector">
-            <option value="">-- Choose a Server --</option>
-        </select>
-        <button id="compare-btn" class="btn btn-primary">Compare</button>
+        <div class="control-group">
+            <label for="server-selector">Select Remote Server:</label>
+            <select id="server-selector">
+                <option value="">-- Choose a Server --</option>
+            </select>
+            <button id="compare-btn" class="btn btn-primary">Compare</button>
+        </div>
+
+        <div id="sort-controls" class="control-group" style="display: none;">
+            <label for="sort-property">Sort By:</label>
+            <select id="sort-property">
+                <option value="title">Title</option>
+                <option value="year">Year</option>
+                <option value="critic_rating">Critic Rating</option>
+                <option value="audience_rating">Audience Rating</option>
+                <option value="size">Size</option>
+                <option value="duration">Duration</option>
+            </select>
+            <label for="sort-direction">Order:</label>
+            <select id="sort-direction">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+            </select>
+        </div>
     </div>
 
     <div id="comparison-view" style="display: none;">

@@ -1,5 +1,8 @@
 import { createMovieCard } from './gallery.js';
 
+let currentRemoteMovies = [];
+let currentServerId = null;
+
 async function populateServers() {
     try {
         const response = await fetch('/api/servers');
@@ -17,6 +20,32 @@ async function populateServers() {
     }
 }
 
+function sortAndRender() {
+    const property = document.getElementById('sort-property').value;
+    const direction = document.getElementById('sort-direction').value;
+    const remoteList = document.getElementById('remote-only-list');
+
+    if (currentRemoteMovies.length === 0) return;
+
+    const sortedMovies = [...currentRemoteMovies].sort((a, b) => {
+        let valA = a[property];
+        let valB = b[property];
+
+        // Handle strings (titles)
+        if (typeof valA === 'string') {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    remoteList.innerHTML = '';
+    sortedMovies.forEach(m => remoteList.appendChild(createMovieCard(m, currentServerId)));
+}
+
 async function startComparison() {
     const selector = document.getElementById('server-selector');
     const id = selector.value;
@@ -27,23 +56,28 @@ async function startComparison() {
         return;
     }
 
+    currentServerId = id;
     const view = document.getElementById('comparison-view');
     const title = document.getElementById('comparing-with-title');
     const remoteList = document.getElementById('remote-only-list');
+    const sortControls = document.getElementById('sort-controls');
 
     view.style.display = 'block';
     title.innerText = `Comparing with ${name}...`;
     remoteList.innerHTML = 'Loading...';
+    sortControls.style.display = 'none';
 
     try {
         const response = await fetch(`/api/compare/${id}`);
         if (!response.ok) throw new Error(await response.text());
         const data = await response.json();
 
+        currentRemoteMovies = data.remote_only || [];
         remoteList.innerHTML = '';
 
-        if (data.remote_only && data.remote_only.length > 0) {
-            data.remote_only.forEach(m => remoteList.appendChild(createMovieCard(m, id)));
+        if (currentRemoteMovies.length > 0) {
+            sortControls.style.display = 'flex';
+            sortAndRender();
         } else {
             remoteList.innerHTML = '<p>Nothing unique found on the remote server.</p>';
         }
@@ -54,4 +88,6 @@ async function startComparison() {
 }
 
 document.getElementById('compare-btn').addEventListener('click', startComparison);
+document.getElementById('sort-property').addEventListener('change', sortAndRender);
+document.getElementById('sort-direction').addEventListener('change', sortAndRender);
 document.addEventListener('DOMContentLoaded', populateServers);
