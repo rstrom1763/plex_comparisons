@@ -97,27 +97,6 @@ func RunServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
-	r.GET("/dump/movies", func(c *gin.Context) {
-		jsonData, err := os.ReadFile("./test_movies.json")
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not read test movies file: " + err.Error(),
-			})
-			return
-		}
-
-		compressedData := utils.GzipData(jsonData)
-		if compressedData == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not gzip movies data",
-			})
-			return
-		}
-
-		c.Header("Content-Encoding", "gzip")
-		c.Data(http.StatusOK, "application/json", compressedData)
-	})
-
 	r.GET("/dump/episodes", func(c *gin.Context) {
 		episodes, err := structs.GetEpisodes(plexDB)
 		if err != nil {
@@ -286,7 +265,7 @@ func RunServer() error {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		client := &http.Client{Transport: tr}
-		resp, err := client.Get(target.Address + "/test/dump/movies")
+		resp, err := client.Get(target.Address + "/dump/movies")
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
 			return
