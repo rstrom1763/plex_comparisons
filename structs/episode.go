@@ -36,6 +36,7 @@ type Episode struct {
 	AudioCodec     string  `json:"audio_codec"`
 	CriticRating   float64 `json:"critic_rating"`
 	AudienceRating float64 `json:"audience_rating"`
+	MetadataHash   string  `json:"metadata_hash"`
 }
 
 func (e *Episode) GetTitle() string {
@@ -73,6 +74,7 @@ func (e *Episode) ToCSV() string {
 		e.AudioCodec,
 		strconv.FormatFloat(e.CriticRating, 'f', 1, 64),
 		strconv.FormatFloat(e.AudienceRating, 'f', 1, 64),
+		e.MetadataHash,
 	}
 
 	for i, field := range fields {
@@ -86,7 +88,7 @@ func (e *Episode) ToCSV() string {
 }
 
 func (e *Episode) CSVHeaders() string {
-	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating\n"
+	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash\n"
 }
 
 func GetEpisodes(db *sql.DB) ([]*Episode, error) {
@@ -124,13 +126,14 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 			AudioCodec     string
 			CriticRating   float64
 			AudienceRating float64
+			MetadataHash   string
 		)
 
 		err = rows.Scan(
 			&ShowTitle, &SeasonNumber, &EpisodeNumber, &EpisodeTitle, &ContentRating,
 			&Year, &Library, &MediaType, &File, &Hash, &Size, &Duration,
 			&Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec,
-			&CriticRating, &AudienceRating,
+			&CriticRating, &AudienceRating, &MetadataHash,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning row: %w", err)
@@ -158,6 +161,7 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 			AudioCodec:     AudioCodec,
 			CriticRating:   math.Round(float64(CriticRating)*10) / 10,
 			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
+			MetadataHash:   MetadataHash,
 		}
 		episodes = append(episodes, e)
 	}
@@ -177,8 +181,8 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 	}()
 
 	r := csv.NewReader(f)
-	// Expect exactly 21 columns (see Episode.CSVHeaders / Episode.ToCSV)
-	r.FieldsPerRecord = 21
+	// Expect exactly 22 columns
+	r.FieldsPerRecord = 22
 
 	var episodes []*Episode
 	row := 0
@@ -214,7 +218,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		row++
 
 		// Skip header row if present
-		if row == 1 && len(rec) == 21 &&
+		if row == 1 && len(rec) == 22 &&
 			strings.EqualFold(trim(rec[0]), "show_title") &&
 			strings.EqualFold(trim(rec[1]), "season_number") &&
 			strings.EqualFold(trim(rec[2]), "episode_number") {
@@ -284,6 +288,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 			AudioCodec:     trim(rec[18]),
 			CriticRating:   math.Round(criticRating*10) / 10,
 			AudienceRating: math.Round(audienceRating*10) / 10,
+			MetadataHash:   trim(rec[21]),
 		}
 
 		episodes = append(episodes, e)

@@ -13,25 +13,26 @@ import (
 )
 
 type Song struct {
-	Title         string `json:"title"`       // metadata_items.title
-	ContentRating string `json:"rating"`      // metadata_items.content_rating
-	Year          int    `json:"year"`        // metadata_items.year
-	Genre         string `json:"genre"`       // metadata_items.tags_genre (nullable)
-	AlbumTitle    string `json:"album_title"` // album_title
-	ArtistName    string `json:"artist_name"` // artist_name
-	Library       string `json:"library"`     // library_sections.name
-	MediaType     string `json:"media_type"`  // derived from library_sections.section_type
-	File          string `json:"file"`        // media_parts.file
-	Hash          string `json:"hash"`        // media_parts.hash
-	Size          int64  `json:"size"`        // media_parts.size
-	Duration      int64  `json:"duration"`    // media_parts.duration
-	Container     string `json:"container"`   // media_items.container
-	Bitrate       int    `json:"bitrate"`     // media_items.bitrate
-	VideoCodec    string `json:"video_codec"` // media_items.video_codec
-	Height        int    `json:"height"`      // media_items.height
-	Width         int    `json:"width"`       // media_items.width
-	Resolution    string `json:"resolution"`  // derived based on width
-	AudioCodec    string `json:"audio_codec"` // media_items.audio_codec
+	Title         string `json:"title"`         // metadata_items.title
+	ContentRating string `json:"rating"`        // metadata_items.content_rating
+	Year          int    `json:"year"`          // metadata_items.year
+	Genre         string `json:"genre"`         // metadata_items.tags_genre (nullable)
+	AlbumTitle    string `json:"album_title"`   // album_title
+	ArtistName    string `json:"artist_name"`   // artist_name
+	Library       string `json:"library"`       // library_sections.name
+	MediaType     string `json:"media_type"`    // derived from library_sections.section_type
+	File          string `json:"file"`          // media_parts.file
+	Hash          string `json:"hash"`          // media_parts.hash
+	Size          int64  `json:"size"`          // media_parts.size
+	Duration      int64  `json:"duration"`      // media_parts.duration
+	Container     string `json:"container"`     // media_items.container
+	Bitrate       int    `json:"bitrate"`       // media_items.bitrate
+	VideoCodec    string `json:"video_codec"`   // media_items.video_codec
+	Height        int    `json:"height"`        // media_items.height
+	Width         int    `json:"width"`         // media_items.width
+	Resolution    string `json:"resolution"`    // derived based on width
+	AudioCodec    string `json:"audio_codec"`   // media_items.audio_codec
+	MetadataHash  string `json:"metadata_hash"` // metadata_items.hash
 }
 
 func (s *Song) GetTitle() string {
@@ -61,6 +62,7 @@ func (s *Song) ToCSV() string {
 		strconv.FormatInt(s.Duration, 10),
 		strconv.Itoa(s.Bitrate),
 		s.AudioCodec,
+		s.MetadataHash,
 	}
 
 	// Escape commas or quotes by wrapping each field in quotes if necessary
@@ -78,7 +80,7 @@ func (s *Song) ToCSV() string {
 }
 
 func (s *Song) CSVHeaders() string {
-	return "title,year,genre,album_title,artist_name,library,media_type,file,hash,size,duration,bitrate,audio_codec\n"
+	return "title,year,genre,album_title,artist_name,library,media_type,file,hash,size,duration,bitrate,audio_codec,metadata_hash\n"
 }
 
 func GetSongs(db *sql.DB) ([]*Song, error) {
@@ -88,19 +90,20 @@ func GetSongs(db *sql.DB) ([]*Song, error) {
 	}
 
 	var (
-		Title      string
-		Year       int
-		Genre      string
-		AlbumTitle string
-		ArtistName string
-		Library    string
-		MediaType  string
-		File       string
-		Hash       string
-		Size       int64
-		Duration   int64
-		Bitrate    int
-		AudioCodec string
+		Title        string
+		Year         int
+		Genre        string
+		AlbumTitle   string
+		ArtistName   string
+		Library      string
+		MediaType    string
+		File         string
+		Hash         string
+		Size         int64
+		Duration     int64
+		Bitrate      int
+		AudioCodec   string
+		MetadataHash string
 	)
 	var Songs []*Song
 
@@ -112,25 +115,26 @@ func GetSongs(db *sql.DB) ([]*Song, error) {
 	}(rows)
 
 	for rows.Next() {
-		err = rows.Scan(&Title, &Year, &Genre, &AlbumTitle, &ArtistName, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec)
+		err = rows.Scan(&Title, &Year, &Genre, &AlbumTitle, &ArtistName, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec, &MetadataHash)
 		if err != nil {
 			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
 		}
 
 		Song := Song{
-			Title:      Title,
-			Year:       Year,
-			Genre:      Genre,
-			AlbumTitle: AlbumTitle,
-			ArtistName: ArtistName,
-			Library:    Library,
-			MediaType:  MediaType,
-			File:       File,
-			Hash:       Hash,
-			Size:       Size,
-			Duration:   Duration,
-			Bitrate:    Bitrate,
-			AudioCodec: AudioCodec,
+			Title:        Title,
+			Year:         Year,
+			Genre:        Genre,
+			AlbumTitle:   AlbumTitle,
+			ArtistName:   ArtistName,
+			Library:      Library,
+			MediaType:    MediaType,
+			File:         File,
+			Hash:         Hash,
+			Size:         Size,
+			Duration:     Duration,
+			Bitrate:      Bitrate,
+			AudioCodec:   AudioCodec,
+			MetadataHash: MetadataHash,
 		}
 
 		Songs = append(Songs, &Song)
@@ -151,8 +155,8 @@ func GetSongsFromCSVFile(path string) ([]*Song, error) {
 	}(file)
 
 	r := csv.NewReader(file)
-	// We expect exactly 13 columns (see Song.CSVHeaders / Song.ToCSV)
-	r.FieldsPerRecord = 13
+	// We expect exactly 14 columns
+	r.FieldsPerRecord = 14
 
 	var songs []*Song
 	row := 0
@@ -168,7 +172,7 @@ func GetSongsFromCSVFile(path string) ([]*Song, error) {
 		row++
 
 		// Skip header row if present
-		if row == 1 && len(record) == 13 &&
+		if row == 1 && len(record) == 14 &&
 			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
 			strings.EqualFold(strings.TrimSpace(record[1]), "year") {
 			continue
@@ -207,19 +211,20 @@ func GetSongsFromCSVFile(path string) ([]*Song, error) {
 		}
 
 		s := &Song{
-			Title:      trim(record[0]),
-			Year:       year,
-			Genre:      trim(record[2]),
-			AlbumTitle: trim(record[3]),
-			ArtistName: trim(record[4]),
-			Library:    trim(record[5]),
-			MediaType:  trim(record[6]),
-			File:       trim(record[7]),
-			Hash:       trim(record[8]),
-			Size:       size,
-			Duration:   duration,
-			Bitrate:    bitrate,
-			AudioCodec: trim(record[12]),
+			Title:        trim(record[0]),
+			Year:         year,
+			Genre:        trim(record[2]),
+			AlbumTitle:   trim(record[3]),
+			ArtistName:   trim(record[4]),
+			Library:      trim(record[5]),
+			MediaType:    trim(record[6]),
+			File:         trim(record[7]),
+			Hash:         trim(record[8]),
+			Size:         size,
+			Duration:     duration,
+			Bitrate:      bitrate,
+			AudioCodec:   trim(record[12]),
+			MetadataHash: trim(record[13]),
 		}
 
 		songs = append(songs, s)

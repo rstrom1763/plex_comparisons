@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -25,6 +26,7 @@ func RunServer() error {
 	port := os.Getenv("PORT")
 	protocol := os.Getenv("PROTOCOL")
 	plexDbPath := os.Getenv("PLEX_DB_PATH")
+	plexDataPath := os.Getenv("PLEX_DATA_PATH")
 
 	plexDB, err := initDB(plexDbPath)
 	if err != nil {
@@ -138,6 +140,44 @@ func RunServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
+	r.GET("/thumb/:hash", func(c *gin.Context) {
+		hash := c.Param("hash")
+
+		if plexDataPath == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "PLEX_DATA_PATH not set in environment",
+			})
+			return
+		}
+
+		if hash == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "no metadata hash provided",
+			})
+			return
+		}
+
+		posterDir := plexMoviePosterDir(plexDataPath, hash)
+		posterPath, err := findPosterFile(posterDir)
+		if err != nil {
+			// Serve a placeholder SVG for missing thumbnails
+			placeholder := `<svg width="200" height="300" xmlns="http://www.w3.org/2000/svg">
+				<rect width="100%" height="100%" fill="#333"/>
+				<text x="50%" y="50%" font-family="Arial" font-size="16" fill="#fff" text-anchor="middle" dy=".3em">No Poster</text>
+			</svg>`
+			c.Data(http.StatusOK, "image/svg+xml", []byte(placeholder))
+			return
+		}
+
+		c.File(posterPath)
+	})
+
+	r.Static("/static", "./static")
+
+	r.GET("/movies/gallery", func(c *gin.Context) {
+		c.File("./static/html/index.html")
+	})
+
 	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port
 	if protocol == "http" {                                        //Start running the Gin server
 		err = r.Run(":" + port)
@@ -154,4 +194,53 @@ func RunServer() error {
 	}
 
 	return nil
+}
+
+func plexMoviePosterDir(plexDataDir string, hash string) string {
+	if hash == "" {
+		return ""
+	}
+
+	return filepath.Join(
+		plexDataDir,
+		"Metadata",
+		"Movies",
+		hash[:1],
+		hash[1:]+".bundle",
+		"Contents",
+		"_combined",
+		"posters",
+	)
+}
+
+func findPosterFile(posterDir string) (string, error) {
+	entries, err := os.ReadDir(posterDir)
+	if err != nil {
+		return "", err
+	}
+
+	var largestFile string
+	var maxSize int64 = -1
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+
+		if info.Size() > maxSize {
+			maxSize = info.Size()
+			largestFile = filepath.Join(posterDir, e.Name())
+		}
+	}
+
+	if largestFile == "" {
+		return "", fmt.Errorf("no poster file found in %s", posterDir)
+	}
+
+	return largestFile, nil
 }

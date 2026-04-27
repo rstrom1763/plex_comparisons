@@ -33,6 +33,7 @@ type Movie struct {
 	AudioCodec     string  `json:"audio_codec"`     // media_items.audio_codec
 	CriticRating   float64 `json:"critic_rating"`   // metadata_items.rating
 	AudienceRating float64 `json:"audience_rating"` // metadata_items.audience_rating
+	MetadataHash   string  `json:"metadata_hash"`   // metadata_items.hash
 }
 
 func (m *Movie) GetTitle() string {
@@ -68,6 +69,7 @@ func (m *Movie) ToCSV() string {
 		m.AudioCodec,
 		strconv.FormatFloat(m.CriticRating, 'f', 1, 64),
 		strconv.FormatFloat(m.AudienceRating, 'f', 1, 64),
+		m.MetadataHash,
 	}
 
 	// Escape commas or quotes by wrapping each field in quotes if necessary
@@ -85,7 +87,7 @@ func (m *Movie) ToCSV() string {
 }
 
 func (m *Movie) CSVHeaders() string {
-	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating\n"
+	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash\n"
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
@@ -115,6 +117,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 		AudioCodec     string
 		CriticRating   float64
 		AudienceRating float64
+		MetadataHash   string
 	)
 	var movies []*Movie
 
@@ -126,7 +129,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 	}(rows)
 
 	for rows.Next() {
-		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec, &CriticRating, &AudienceRating)
+		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec, &CriticRating, &AudienceRating, &MetadataHash)
 		if err != nil {
 			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
 		}
@@ -151,6 +154,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 			AudioCodec:     AudioCodec,
 			CriticRating:   math.Round(float64(CriticRating)*10) / 10,
 			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
+			MetadataHash:   MetadataHash,
 		}
 
 		movies = append(movies, &movie)
@@ -174,7 +178,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 	}(file)
 
 	csvReader := csv.NewReader(file)
-	csvReader.FieldsPerRecord = 19
+	csvReader.FieldsPerRecord = 20
 
 	var movies []*Movie
 	row := 0
@@ -190,7 +194,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 		row++
 
 		// Skip header row
-		if row == 1 && len(record) == 19 &&
+		if row == 1 && len(record) == 20 &&
 			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
 			strings.EqualFold(strings.TrimSpace(record[1]), "rating") {
 			continue
@@ -271,6 +275,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 			AudioCodec:     trim(record[16]),
 			CriticRating:   math.Round(criticRating*10) / 10,
 			AudienceRating: math.Round(audienceRating*10) / 10,
+			MetadataHash:   trim(record[19]),
 		}
 
 		movies = append(movies, movie)
