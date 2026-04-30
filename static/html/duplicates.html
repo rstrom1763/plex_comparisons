@@ -131,6 +131,10 @@
                 <span>Exact Dupe Waste:</span>
                 <span id="wasted-space-value">0 B</span>
             </div>
+            <div id="total-wasted-container" class="wasted-space-badge" style="display: none; background-color: var(--primary-color);">
+                <span>Total Dupe Waste:</span>
+                <span id="total-wasted-value">0 B</span>
+            </div>
         </div>
     </div>
 
@@ -223,9 +227,11 @@
         }
 
         function updateWastedSpace(groups) {
+            let exactWasted = 0;
             let totalWasted = 0;
             
             groups.forEach(group => {
+                // Exact Dupe Waste calculation
                 const hashGroups = {};
                 group.forEach(m => {
                     const h = m.hash ? m.hash.trim() : '';
@@ -238,19 +244,43 @@
                 Object.values(hashGroups).forEach(versions => {
                     if (versions.length >= 2) {
                         const size = versions[0].size || 0;
-                        totalWasted += (versions.length - 1) * size;
+                        exactWasted += (versions.length - 1) * size;
                     }
                 });
+
+                // Total Dupe Waste calculation
+                // For any media that has duplicates, add up the file space used by them all except for the file that is the largest
+                if (group.length > 1) {
+                    let maxVal = -1;
+                    let groupTotal = 0;
+                    group.forEach(m => {
+                        const size = m.size || 0;
+                        groupTotal += size;
+                        if (size > maxVal) {
+                            maxVal = size;
+                        }
+                    });
+                    totalWasted += (groupTotal - maxVal);
+                }
             });
             
-            const badge = document.getElementById('wasted-space-container');
-            const valueSpan = document.getElementById('wasted-space-value');
+            const exactBadge = document.getElementById('wasted-space-container');
+            const exactValueSpan = document.getElementById('wasted-space-value');
+            const totalBadge = document.getElementById('total-wasted-container');
+            const totalValueSpan = document.getElementById('total-wasted-value');
             
-            if (totalWasted > 0) {
-                valueSpan.textContent = formatSize(totalWasted);
-                badge.style.display = 'inline-flex';
+            if (exactWasted > 0) {
+                exactValueSpan.textContent = formatSize(exactWasted);
+                exactBadge.style.display = 'inline-flex';
             } else {
-                badge.style.display = 'none';
+                exactBadge.style.display = 'none';
+            }
+
+            if (totalWasted > 0) {
+                totalValueSpan.textContent = formatSize(totalWasted);
+                totalBadge.style.display = 'inline-flex';
+            } else {
+                totalBadge.style.display = 'none';
             }
         }
 
