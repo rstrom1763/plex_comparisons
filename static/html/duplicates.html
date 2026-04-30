@@ -65,6 +65,29 @@
             margin-top: 6px;
             font-weight: 500;
         }
+        .file-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+        .file-play-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .file-play-btn:hover {
+            background: var(--primary-light);
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
@@ -97,7 +120,7 @@
     </div>
 
     <script type="module">
-        import { formatSize } from '/static/js/gallery.js';
+        import { formatSize, openVideoPlayer } from '/static/js/gallery.js';
 
         let duplicateGroups = [];
 
@@ -144,15 +167,28 @@
                     const li = document.createElement('li');
                     li.className = 'file-item';
                     
+                    const header = document.createElement('div');
+                    header.className = 'file-item-header';
+
+                    const playBtn = document.createElement('button');
+                    playBtn.className = 'file-play-btn';
+                    playBtn.innerHTML = '▶ Play';
+                    playBtn.title = 'Play Preview';
+                    playBtn.onclick = () => openVideoPlayer(movie.hash, group[0].title, movie.video_codec, movie.audio_codec);
+                    
                     const path = document.createElement('span');
                     path.className = 'file-path';
                     path.textContent = movie.file;
                     
+                    header.appendChild(playBtn);
+                    header.appendChild(path);
+
                     const meta = document.createElement('span');
                     meta.className = 'file-meta';
+                    meta.style.paddingLeft = '55px'; // Align with path text
                     meta.textContent = `${movie.resolution} | ${movie.video_codec} | ${formatSize(movie.size)} | Hash: ${movie.hash || 'N/A'}`;
                     
-                    li.appendChild(path);
+                    li.appendChild(header);
                     li.appendChild(meta);
                     fileList.appendChild(li);
                 });

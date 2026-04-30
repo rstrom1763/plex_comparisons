@@ -192,6 +192,46 @@ func RunServer() error {
 		c.File(posterPath)
 	})
 
+	r.GET("/video/:hash", func(c *gin.Context) {
+		hash := c.Param("hash")
+		if hash == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no hash provided"})
+			return
+		}
+
+		movies, err := structs.GetMovies(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var targetMovie *structs.Movie
+		for _, m := range movies {
+			if m.Hash == hash {
+				targetMovie = m
+				break
+			}
+		}
+
+		if targetMovie == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "movie not found"})
+			return
+		}
+
+		videoPath := targetMovie.File
+		if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "video file not found on disk",
+				"path":  videoPath,
+			})
+			return
+		}
+
+		// Ensure we support range requests for streaming
+		c.Header("Accept-Ranges", "bytes")
+		c.File(videoPath)
+	})
+
 	r.GET("/remote-thumb/:id/:hash", func(c *gin.Context) {
 		idStr := c.Param("id")
 		hash := c.Param("hash")
