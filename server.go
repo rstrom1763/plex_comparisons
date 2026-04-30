@@ -267,7 +267,34 @@ func RunServer() error {
 		c.File("./static/html/add_server.html")
 	})
 
+	r.GET("/duplicates", func(c *gin.Context) {
+		c.File("./static/html/duplicates.html")
+	})
+
 	// Local State API
+	r.GET("/api/duplicates", func(c *gin.Context) {
+		movies, err := structs.GetMovies(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		duplicates := make(map[string][]*structs.Movie)
+		for _, m := range movies {
+			key := m.GetUniqueTitle()
+			duplicates[key] = append(duplicates[key], m)
+		}
+
+		var result [][]*structs.Movie
+		for _, group := range duplicates {
+			if len(group) > 1 {
+				result = append(result, group)
+			}
+		}
+
+		c.JSON(http.StatusOK, result)
+	})
+
 	r.GET("/api/servers", func(c *gin.Context) {
 		servers, err := localDAO.GetServers()
 		if err != nil {

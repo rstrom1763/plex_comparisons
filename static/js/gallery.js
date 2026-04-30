@@ -48,6 +48,7 @@ export function createMovieCard(movie, serverId = null) {
                 <div class="metadata-label">Duration</div><div>${formatDuration(movie.duration)}</div>
                 <div class="metadata-label">Critic</div><div>${(movie.critic_rating || 0).toFixed(1)}</div>
                 <div class="metadata-label">Audience</div><div>${(movie.audience_rating || 0).toFixed(1)}</div>
+                <div class="metadata-label">Hash</div><div style="font-family: monospace; font-size: 0.8em; word-break: break-all;">${movie.hash || 'N/A'}</div>
             </div>
         </div>
     `;

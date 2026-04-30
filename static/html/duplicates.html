@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duplicates</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .duplicate-group {
+            background-color: var(--card-bg);
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            display: flex;
+            gap: 25px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: var(--transition);
+        }
+        .duplicate-group:hover {
+            border-color: var(--primary-light);
+        }
+        .duplicate-poster {
+            flex: 0 0 160px;
+        }
+        .duplicate-poster img {
+            width: 160px;
+            height: 240px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .duplicate-details {
+            flex: 1;
+        }
+        .duplicate-group h2 {
+            margin-top: 0;
+            text-align: left;
+            color: var(--accent-color);
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-item {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            word-break: break-all;
+            color: var(--text-color);
+            font-size: 0.85rem;
+        }
+        .file-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/movies/gallery">← Back to Gallery</a>
+        <a href="/compare">Compare Servers</a>
+        <a href="/add-server">Manage Servers</a>
+    </nav>
+    <h1>Duplicate Movies</h1>
+    
+    <div class="content-block comparison-header">
+        <div id="sort-controls" class="control-group">
+            <label for="sort-property">Sort By:</label>
+            <select id="sort-property">
+                <option value="title">Title</option>
+                <option value="year">Year</option>
+                <option value="versions">Versions Count</option>
+            </select>
+            <label for="sort-direction">Order:</label>
+            <select id="sort-direction">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="duplicates-container" style="max-width: 1000px; margin: 0 auto;">
+        <!-- Duplicates will be loaded here -->
+        <p style="text-align: center;">Loading duplicates...</p>
+    </div>
+
+    <script type="module">
+        import { formatSize } from '/static/js/gallery.js';
+
+        let duplicateGroups = [];
+
+        function renderDuplicates(groups) {
+            const container = document.getElementById('duplicates-container');
+            container.innerHTML = '';
+            
+            if (!groups || groups.length === 0) {
+                container.innerHTML = '<p style="text-align: center;">No duplicates found!</p>';
+                return;
+            }
+
+            groups.forEach(group => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'duplicate-group';
+
+                const posterDiv = document.createElement('div');
+                posterDiv.className = 'duplicate-poster';
+                const img = document.createElement('img');
+                img.src = `/thumb/${group[0].metadata_hash}`;
+                img.alt = group[0].title;
+                img.loading = 'lazy';
+                posterDiv.appendChild(img);
+                groupDiv.appendChild(posterDiv);
+
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'duplicate-details';
+                
+                const title = document.createElement('h2');
+                title.textContent = `${group[0].title} (${group[0].year})`;
+                detailsDiv.appendChild(title);
+
+                const stats = document.createElement('div');
+                stats.className = 'file-meta';
+                stats.style.marginBottom = '10px';
+                stats.style.color = 'var(--primary-light)';
+                stats.textContent = `${group.length} versions found`;
+                detailsDiv.appendChild(stats);
+
+                const fileList = document.createElement('ul');
+                fileList.className = 'file-list';
+
+                group.forEach(movie => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    
+                    const path = document.createElement('span');
+                    path.className = 'file-path';
+                    path.textContent = movie.file;
+                    
+                    const meta = document.createElement('span');
+                    meta.className = 'file-meta';
+                    meta.textContent = `${movie.resolution} | ${movie.video_codec} | ${formatSize(movie.size)} | Hash: ${movie.hash || 'N/A'}`;
+                    
+                    li.appendChild(path);
+                    li.appendChild(meta);
+                    fileList.appendChild(li);
+                });
+
+                detailsDiv.appendChild(fileList);
+                groupDiv.appendChild(detailsDiv);
+                container.appendChild(groupDiv);
+            });
+        }
+
+        function sortAndRender() {
+            const property = document.getElementById('sort-property').value;
+            const direction = document.getElementById('sort-direction').value;
+
+            const sortedGroups = [...duplicateGroups].sort((a, b) => {
+                let valA, valB;
+
+                if (property === 'versions') {
+                    valA = a.length;
+                    valB = b.length;
+                } else {
+                    valA = a[0][property];
+                    valB = b[0][property];
+                }
+
+                if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = valB.toLowerCase();
+                }
+
+                if (valA < valB) return direction === 'asc' ? -1 : 1;
+                if (valA > valB) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            renderDuplicates(sortedGroups);
+        }
+
+        async function loadDuplicates() {
+            const container = document.getElementById('duplicates-container');
+            try {
+                const response = await fetch('/api/duplicates');
+                if (!response.ok) throw new Error('Failed to fetch duplicates');
+                duplicateGroups = await response.json();
+                sortAndRender();
+            } catch (error) {
+                container.innerHTML = `<p style="color: red; text-align: center;">Error: ${error.message}</p>`;
+            }
+        }
+
+        document.getElementById('sort-property').addEventListener('change', sortAndRender);
+        document.getElementById('sort-direction').addEventListener('change', sortAndRender);
+        loadDuplicates();
+    </script>
+</body>
+</html>
