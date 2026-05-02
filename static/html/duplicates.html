@@ -48,7 +48,14 @@
             padding: 12px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        .file-info {
+            flex: 1;
+            min-width: 0;
         }
         .file-item:last-child {
             border-bottom: none;
@@ -62,13 +69,13 @@
         .file-meta {
             font-size: 0.8rem;
             color: var(--text-muted);
-            margin-top: 6px;
+            margin-top: 4px;
             font-weight: 500;
         }
         .file-item-header {
             display: flex;
-            align-items: flex-start;
-            gap: 15px;
+            align-items: center;
+            gap: 12px;
         }
         .file-play-btn {
             background: var(--primary-color);
@@ -87,6 +94,29 @@
         .file-play-btn:hover {
             background: var(--primary-light);
             transform: scale(1.05);
+        }
+        .file-delete-btn {
+            background: #d9534f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .file-delete-btn:hover {
+            background: #c9302c;
+            transform: scale(1.05);
+        }
+        .file-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
         }
         .wasted-space-badge {
             background-color: #d9534f;
@@ -117,6 +147,7 @@
                 <option value="title">Title</option>
                 <option value="year">Year</option>
                 <option value="versions">Versions Count</option>
+                <option value="wasted">Wasted Space</option>
             </select>
             <label for="sort-direction">Order:</label>
             <select id="sort-direction">
@@ -194,6 +225,9 @@
                     const li = document.createElement('li');
                     li.className = 'file-item';
                     
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+
                     const header = document.createElement('div');
                     header.className = 'file-item-header';
 
@@ -210,13 +244,26 @@
                     header.appendChild(playBtn);
                     header.appendChild(path);
 
-                    const meta = document.createElement('span');
+                    const meta = document.createElement('div');
                     meta.className = 'file-meta';
                     meta.style.paddingLeft = '55px'; // Align with path text
                     meta.textContent = `${movie.resolution} | ${movie.video_codec} | ${formatSize(movie.size)} | Hash: ${movie.hash || 'N/A'}`;
                     
-                    li.appendChild(header);
-                    li.appendChild(meta);
+                    fileInfo.appendChild(header);
+                    fileInfo.appendChild(meta);
+                    li.appendChild(fileInfo);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'file-actions';
+
+                    const deleteFileBtn = document.createElement('button');
+                    deleteFileBtn.className = 'file-delete-btn';
+                    deleteFileBtn.textContent = 'Delete File';
+                    deleteFileBtn.onclick = () => deleteFile(movie.hash, movie.file);
+
+                    actions.appendChild(deleteFileBtn);
+                    li.appendChild(actions);
+
                     fileList.appendChild(li);
                 });
 
@@ -327,6 +374,20 @@
                 if (property === 'versions') {
                     valA = a.length;
                     valB = b.length;
+                } else if (property === 'wasted') {
+                    const calcWasted = (group) => {
+                        if (group.length <= 1) return 0;
+                        let maxVal = -1;
+                        let groupTotal = 0;
+                        group.forEach(m => {
+                            const size = m.size || 0;
+                            groupTotal += size;
+                            if (size > maxVal) maxVal = size;
+                        });
+                        return groupTotal - maxVal;
+                    };
+                    valA = calcWasted(a);
+                    valB = calcWasted(b);
                 } else {
                     valA = a[0][property];
                     valB = b[0][property];
@@ -360,6 +421,29 @@
         document.getElementById('sort-property').addEventListener('change', sortAndRender);
         document.getElementById('sort-direction').addEventListener('change', sortAndRender);
         document.getElementById('filter-exact').addEventListener('change', sortAndRender);
+
+        async function deleteFile(hash, path) {
+            if (!path) {
+                alert('Cannot delete: File path is missing.');
+                return;
+            }
+            if (!confirm(`Are you sure you want to delete this file?\n\n${path}`)) return;
+            
+            try {
+                const response = await fetch('/api/file', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hash, path })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to delete file');
+                alert('File deleted successfully');
+                loadDuplicates(); // Refresh the list
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
         loadDuplicates();
     </script>
 </body>

@@ -367,6 +367,53 @@ func RunServer() error {
 		c.Status(http.StatusNoContent)
 	})
 
+	r.DELETE("/api/file", func(c *gin.Context) {
+		var req struct {
+			Hash string `json:"hash"`
+			Path string `json:"path"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Hash == "" && req.Path == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "hash or path is required"})
+			return
+		}
+
+		// Retrieve path from metadata
+		var filePath string
+		var err error
+		if req.Path != "" {
+			err = plexDB.QueryRow("SELECT file FROM media_parts WHERE file = ?", req.Path).Scan(&filePath)
+		} else {
+			err = plexDB.QueryRow("SELECT file FROM media_parts WHERE hash = ?", req.Hash).Scan(&filePath)
+		}
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "file not found in metadata"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("database error: %v", err)})
+			}
+			return
+		}
+
+		// Security check: ensure the file exists before trying to delete
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "file not found on disk"})
+			return
+		}
+
+		if err := os.Remove(filePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to delete file: %v", err)})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "file deleted successfully"})
+	})
+
 	r.PUT("/api/servers/:id", func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, _ := strconv.Atoi(idStr)
