@@ -12,3 +12,9 @@ type AllowListedServer struct {
 	Name  string `json:"name"`
 	Token string `json:"token"`
 }
+
+type SavedFilter struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	FilterData string `json:"filter_data"` // Base64 encoded JSON
+}

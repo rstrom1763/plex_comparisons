@@ -314,6 +314,157 @@ nav a:hover {
     color: var(--text-color);
 }
 
+/* Saved Filters Section */
+.saved-filters-section {
+    margin-top: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.save-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.save-row input {
+    flex: 1;
+    background: #2a2f28;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.update-row {
+    margin-bottom: 15px;
+}
+
+.update-filters-btn {
+    width: 100%;
+    padding: 10px;
+    background: #4a5568;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.update-filters-btn:hover:not(:disabled) {
+    background: #2d3748;
+}
+
+.update-filters-btn:disabled {
+    background: #2d3748;
+    color: #718096;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+#save-filter-btn {
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#save-filter-btn:disabled {
+    background: #444;
+    color: #888;
+    cursor: not-allowed;
+}
+
+.saved-filters-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.saved-filter-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+
+.saved-filter-item.active {
+    background: rgba(143, 179, 57, 0.15);
+    border-color: var(--accent-color);
+}
+
+.saved-filter-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.saved-filter-item .item-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.saved-filter-item .active-mark {
+    color: var(--accent-color);
+    font-weight: bold;
+    min-width: 15px;
+}
+
+.saved-filter-item .filter-name {
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-filter-item .item-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.saved-filter-item .delete-btn, .saved-filter-item .rename-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 0 5px;
+    opacity: 0.5;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.saved-filter-item .rename-btn {
+    color: var(--text-muted);
+}
+
+.saved-filter-item .delete-btn {
+    color: #ff4d4d;
+}
+
+.saved-filter-item:hover .delete-btn, .saved-filter-item:hover .rename-btn {
+    opacity: 1;
+}
+
+.saved-filter-item .rename-btn:hover {
+    color: var(--accent-color);
+}
+
 .movie {
     background-color: var(--card-bg);
     border-radius: var(--border-radius);

@@ -24,6 +24,11 @@ func NewLocalStateDAO(dbPath string) (*LocalStateDAO, error) {
 		return nil, fmt.Errorf("could not create servers table: %w", err)
 	}
 
+	if _, err := db.Exec(constants.CREATE_SAVED_FILTERS_TABLE); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("could not create saved filters table: %w", err)
+	}
+
 	return &LocalStateDAO{db: db}, nil
 }
 
@@ -71,6 +76,50 @@ func (dao *LocalStateDAO) UpdateServer(server structs.Server) error {
 	_, err := dao.db.Exec(constants.UPDATE_SERVER, server.Name, server.Address, server.Token, server.ID)
 	if err != nil {
 		return fmt.Errorf("could not update server: %w", err)
+	}
+	return nil
+}
+
+func (dao *LocalStateDAO) AddSavedFilter(filter structs.SavedFilter) (int64, error) {
+	result, err := dao.db.Exec(constants.INSERT_SAVED_FILTER, filter.Name, filter.FilterData)
+	if err != nil {
+		return 0, fmt.Errorf("could not add saved filter: %w", err)
+	}
+	return result.LastInsertId()
+}
+
+func (dao *LocalStateDAO) GetSavedFilters() ([]structs.SavedFilter, error) {
+	rows, err := dao.db.Query(constants.SELECT_ALL_SAVED_FILTERS)
+	if err != nil {
+		return nil, fmt.Errorf("could not query saved filters: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var filters []structs.SavedFilter
+	for rows.Next() {
+		var f structs.SavedFilter
+		if err := rows.Scan(&f.ID, &f.Name, &f.FilterData); err != nil {
+			return nil, fmt.Errorf("could not scan saved filter: %w", err)
+		}
+		filters = append(filters, f)
+	}
+	return filters, nil
+}
+
+func (dao *LocalStateDAO) DeleteSavedFilter(id int) error {
+	_, err := dao.db.Exec(constants.DELETE_SAVED_FILTER, id)
+	if err != nil {
+		return fmt.Errorf("could not delete saved filter: %w", err)
+	}
+	return nil
+}
+
+func (dao *LocalStateDAO) UpdateSavedFilter(filter structs.SavedFilter) error {
+	_, err := dao.db.Exec(constants.UPDATE_SAVED_FILTER, filter.Name, filter.FilterData, filter.ID)
+	if err != nil {
+		return fmt.Errorf("could not update saved filter: %w", err)
 	}
 	return nil
 }

@@ -232,6 +232,10 @@ export class FilterPanel {
         this.rootGroup = new FilterGroup(LogicOperators.AND);
         this.sortProperty = properties[0].value;
         this.sortDirection = 'asc';
+        this.activeSavedFilterId = null;
+        this.activeSavedFilterName = '';
+        this.preSavedFilterState = null;
+        this.lastSavedState = null;
         
         this.loadFromURL();
         this.lastAppliedState = this.serializeState();
@@ -423,6 +427,9 @@ export class FilterPanel {
             this.rootGroup = new FilterGroup(LogicOperators.AND);
             this.sortProperty = this.properties[0].value;
             this.sortDirection = 'asc';
+            this.activeSavedFilterId = null;
+            this.activeSavedFilterName = '';
+            this.lastSavedState = null;
             this.lastAppliedState = this.serializeState();
             this.updateURL();
             this.render();
@@ -433,7 +440,273 @@ export class FilterPanel {
         };
         this.container.appendChild(resetBtn);
 
+        if (this.activeSavedFilterId) {
+            const updateRow = document.createElement('div');
+            updateRow.className = 'update-row';
+            const updateBtn = document.createElement('button');
+            updateBtn.className = 'update-filters-btn';
+            updateBtn.textContent = `Update "${this.activeSavedFilterName}"`;
+            updateBtn.onclick = () => this.updateSavedFilter();
+            
+            // Disable update if no changes
+            const currentState = this.serializeState();
+            updateBtn.disabled = currentState === this.lastAppliedState;
+
+            updateRow.appendChild(updateBtn);
+            this.container.appendChild(updateRow);
+        }
+
+        const divider2 = document.createElement('hr');
+        divider2.className = 'filter-divider';
+        this.container.appendChild(divider2);
+
+        const savedSection = document.createElement('div');
+        savedSection.className = 'saved-filters-section';
+        savedSection.innerHTML = '<h3>Saved Filters</h3>';
+
+        const saveRow = document.createElement('div');
+        saveRow.className = 'save-row';
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Filter Name';
+        nameInput.id = 'save-filter-name';
+        const saveBtn = document.createElement('button');
+        saveBtn.id = 'save-filter-btn';
+        saveBtn.textContent = 'Save Current';
+        saveBtn.onclick = () => this.saveCurrentFilter();
+        saveRow.appendChild(nameInput);
+        saveRow.appendChild(saveBtn);
+        savedSection.appendChild(saveRow);
+
+        const savedList = document.createElement('div');
+        savedList.id = 'saved-filters-list';
+        savedList.className = 'saved-filters-list';
+        savedSection.appendChild(savedList);
+
+        this.container.appendChild(savedSection);
+        this.loadSavedFilters();
+
         this.updateApplyButton();
+    }
+
+    async saveCurrentFilter() {
+        const nameInput = document.getElementById('save-filter-name');
+        const name = nameInput.value.trim();
+        if (!name) {
+            alert('Please enter a name for the filter');
+            return;
+        }
+
+        const state = JSON.parse(this.serializeState());
+        const filterData = btoa(JSON.stringify(state));
+
+        try {
+            const resp = await fetch('/api/filters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, filter_data: filterData })
+            });
+            if (resp.ok) {
+                nameInput.value = '';
+                this.loadSavedFilters();
+            } else {
+                const err = await resp.json();
+                alert('Error saving filter: ' + err.error);
+            }
+        } catch (e) {
+            alert('Failed to save filter: ' + e.message);
+        }
+    }
+
+    async loadSavedFilters() {
+        const list = document.getElementById('saved-filters-list');
+        if (!list) return;
+
+        try {
+            const resp = await fetch('/api/filters');
+            const filters = await resp.json();
+            list.innerHTML = '';
+            filters.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'saved-filter-item';
+                if (f.id === this.activeSavedFilterId) {
+                    item.classList.add('active');
+                }
+                
+                const leftPart = document.createElement('div');
+                leftPart.className = 'item-left';
+
+                const activeMark = document.createElement('span');
+                activeMark.className = 'active-mark';
+                activeMark.innerHTML = f.id === this.activeSavedFilterId ? '✓' : '';
+                leftPart.appendChild(activeMark);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'filter-name';
+                nameSpan.textContent = f.name;
+                nameSpan.onclick = () => this.applySavedFilter(f);
+                leftPart.appendChild(nameSpan);
+
+                const actions = document.createElement('div');
+                actions.className = 'item-actions';
+
+                const renameBtn = document.createElement('button');
+                renameBtn.innerHTML = '✎';
+                renameBtn.className = 'rename-btn';
+                renameBtn.title = 'Rename Filter';
+                renameBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.renameSavedFilter(f.id, f.name);
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '×';
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.title = 'Delete Filter';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteSavedFilter(f.id);
+                };
+
+                actions.appendChild(renameBtn);
+                actions.appendChild(deleteBtn);
+                
+                item.appendChild(leftPart);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        } catch (e) {
+            console.error('Failed to load saved filters:', e);
+        }
+    }
+
+    async renameSavedFilter(id, currentName) {
+        const newName = prompt('Enter new name for the filter:', currentName);
+        if (!newName || newName.trim() === '' || newName === currentName) return;
+
+        try {
+            // We need the data to update it, but the API might not require it if we only want to update the name
+            // Actually, our PUT /api/filters/:id probably expects the full object.
+            // Let's check how updateSavedFilter does it.
+            
+            // To be safe, fetch the filter first to get its current data
+            const resp = await fetch('/api/filters');
+            const filters = await resp.json();
+            const filter = filters.find(f => f.id === id);
+            if (!filter) return;
+
+            const updateResp = await fetch(`/api/filters/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: newName.trim(),
+                    filter_data: filter.filter_data
+                })
+            });
+
+            if (updateResp.ok) {
+                if (this.activeSavedFilterId === id) {
+                    this.activeSavedFilterName = newName.trim();
+                }
+                this.render();
+                this.loadSavedFilters();
+            } else {
+                const err = await updateResp.json();
+                alert('Error renaming filter: ' + err.error);
+            }
+        } catch (e) {
+            alert('Failed to rename filter: ' + e.message);
+        }
+    }
+
+    applySavedFilter(filterObj) {
+        try {
+            if (this.activeSavedFilterId === filterObj.id) {
+                // Toggling off: restore previous state
+                if (this.preSavedFilterState) {
+                    const decoded = JSON.parse(this.preSavedFilterState);
+                    this.rootGroup = FilterGroup.deserialize(decoded.filters);
+                    this.sortProperty = decoded.sort.property;
+                    this.sortDirection = decoded.sort.direction;
+                    this.preSavedFilterState = null;
+                }
+                this.activeSavedFilterId = null;
+                this.activeSavedFilterName = '';
+                this.lastSavedState = null;
+            } else {
+                // Toggling on (or switching): 
+                // If we aren't already in a saved filter, save the current state as "pre-selection"
+                if (!this.activeSavedFilterId) {
+                    this.preSavedFilterState = this.serializeState();
+                }
+
+                const decoded = JSON.parse(atob(filterObj.filter_data));
+                this.rootGroup = FilterGroup.deserialize(decoded.filters);
+                this.sortProperty = decoded.sort.property;
+                this.sortDirection = decoded.sort.direction;
+                
+                this.activeSavedFilterId = filterObj.id;
+                this.activeSavedFilterName = filterObj.name;
+                this.lastSavedState = this.serializeState();
+            }
+            
+            this.lastAppliedState = this.serializeState();
+            this.updateURL();
+            this.render();
+            this.onFilterChange(this.rootGroup, {
+                property: this.sortProperty,
+                direction: this.sortDirection
+            });
+        } catch (e) {
+            console.error('Failed to apply saved filter:', e);
+            alert('Failed to apply saved filter');
+        }
+    }
+
+    async deleteSavedFilter(id) {
+        if (!confirm('Are you sure you want to delete this saved filter?')) return;
+        try {
+            const resp = await fetch(`/api/filters/${id}`, { method: 'DELETE' });
+            if (resp.ok) {
+                if (this.activeSavedFilterId === id) {
+                    this.activeSavedFilterId = null;
+                    this.activeSavedFilterName = '';
+                    this.render();
+                }
+                this.loadSavedFilters();
+            }
+        } catch (e) {
+            console.error('Failed to delete filter:', e);
+        }
+    }
+
+    async updateSavedFilter() {
+        if (!this.activeSavedFilterId) return;
+
+        const state = JSON.parse(this.serializeState());
+        const filterData = btoa(JSON.stringify(state));
+
+        try {
+            const resp = await fetch(`/api/filters/${this.activeSavedFilterId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    name: this.activeSavedFilterName, 
+                    filter_data: filterData 
+                })
+            });
+            if (resp.ok) {
+                this.lastSavedState = this.serializeState();
+                this.lastAppliedState = this.serializeState();
+                this.render();
+                this.loadSavedFilters();
+            } else {
+                const err = await resp.json();
+                alert('Error updating filter: ' + err.error);
+            }
+        } catch (e) {
+            alert('Failed to update filter: ' + e.message);
+        }
     }
 
     serializeState() {
@@ -448,11 +721,19 @@ export class FilterPanel {
 
     updateApplyButton() {
         const applyBtn = document.getElementById('apply-filters-btn');
+        const saveBtn = document.getElementById('save-filter-btn');
         if (!applyBtn) return;
 
         const currentState = this.serializeState();
-        const isModified = currentState !== this.lastAppliedState;
-        applyBtn.disabled = !isModified;
+        const isModifiedFromApplied = currentState !== this.lastAppliedState;
+        applyBtn.disabled = !isModifiedFromApplied;
+        if (saveBtn) saveBtn.disabled = false; // Always allow saving the current visible state
+
+        const updateBtn = this.container.querySelector('.update-filters-btn');
+        if (updateBtn) {
+            const isModifiedFromSaved = currentState !== this.lastSavedState;
+            updateBtn.disabled = !isModifiedFromSaved;
+        }
     }
 
     // Listens for popstate to handle browser back/forward

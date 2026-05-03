@@ -344,6 +344,55 @@ func RunServer() error {
 		c.JSON(http.StatusOK, servers)
 	})
 
+	r.GET("/api/filters", func(c *gin.Context) {
+		filters, err := localDAO.GetSavedFilters()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, filters)
+	})
+
+	r.POST("/api/filters", func(c *gin.Context) {
+		var filter structs.SavedFilter
+		if err := c.ShouldBindJSON(&filter); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		id, err := localDAO.AddSavedFilter(filter)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"id": id})
+	})
+
+	r.DELETE("/api/filters/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+		if err := localDAO.DeleteSavedFilter(id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
+
+	r.PUT("/api/filters/:id", func(c *gin.Context) {
+		idStr := c.Param("id")
+		id, _ := strconv.Atoi(idStr)
+		var filter structs.SavedFilter
+		if err := c.ShouldBindJSON(&filter); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		filter.ID = id
+		if err := localDAO.UpdateSavedFilter(filter); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	})
+
 	r.POST("/api/servers", func(c *gin.Context) {
 		var server structs.Server
 		if err := c.ShouldBindJSON(&server); err != nil {

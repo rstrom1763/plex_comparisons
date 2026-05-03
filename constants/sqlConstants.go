@@ -133,3 +133,15 @@ const INSERT_SERVER string = `INSERT INTO servers (name, address, token) VALUES 
 const SELECT_ALL_SERVERS string = `SELECT id, name, address, token FROM servers;`
 const DELETE_SERVER string = `DELETE FROM servers WHERE id = ?;`
 const UPDATE_SERVER string = `UPDATE servers SET name = ?, address = ?, token = ? WHERE id = ?;`
+
+const CREATE_SAVED_FILTERS_TABLE string = `
+CREATE TABLE IF NOT EXISTS saved_filters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    filter_data TEXT NOT NULL
+);`
+
+const INSERT_SAVED_FILTER string = `INSERT INTO saved_filters (name, filter_data) VALUES (?, ?);`
+const SELECT_ALL_SAVED_FILTERS string = `SELECT id, name, filter_data FROM saved_filters;`
+const DELETE_SAVED_FILTER string = `DELETE FROM saved_filters WHERE id = ?;`
+const UPDATE_SAVED_FILTER string = `UPDATE saved_filters SET name = ?, filter_data = ? WHERE id = ?;`
