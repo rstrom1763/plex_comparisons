@@ -166,6 +166,9 @@
                 <span>Total Dupe Waste:</span>
                 <span id="total-wasted-value">0 B</span>
             </div>
+            <div class="wasted-space-badge" style="background-color: #5bc0de;">
+                <span id="group-count">0</span> groups found
+            </div>
         </div>
     </div>
 
@@ -182,6 +185,11 @@
         function renderDuplicates(groups) {
             const container = document.getElementById('duplicates-container');
             container.innerHTML = '';
+            
+            const countSpan = document.getElementById('group-count');
+            if (countSpan) {
+                countSpan.textContent = groups.length;
+            }
             
             // Calculate total wasted space from ALL data
             updateWastedSpace(duplicateGroups);

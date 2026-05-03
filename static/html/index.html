@@ -13,8 +13,21 @@
         <a href="/add-server">Manage Servers →</a>
     </nav>
     <h1>Movie Gallery</h1>
-    <div id="movie-gallery" class="gallery">
-        <!-- Movies will be loaded here dynamically -->
+    <div class="main-container">
+        <div class="gallery-container">
+            <div id="gallery-info" class="gallery-info">
+                <span id="item-count">0</span> items found
+            </div>
+            <div id="movie-gallery" class="gallery">
+                <p style="grid-column: 1/-1; text-align: center;">Loading movies...</p>
+            </div>
+        </div>
+        <aside class="filter-sidebar collapsed">
+            <div id="filter-container">
+                <!-- Filter Panel will be rendered here -->
+                <p>Loading filters...</p>
+            </div>
+        </aside>
     </div>
 
     <script src="/static/js/gallery.js" type="module"></script>
