@@ -1,7 +1,27 @@
 import { createMovieCard } from './gallery.js';
+import { FilterPanel } from './filter.js';
 
 let currentRemoteMovies = [];
+let currentFilteredMovies = [];
 let currentServerId = null;
+let filterPanel = null;
+
+const movieProperties = [
+    { value: 'title', label: 'Title' },
+    { value: 'year', label: 'Year' },
+    { value: 'rating', label: 'Content Rating' },
+    { value: 'genre', label: 'Genre' },
+    { value: 'library', label: 'Library' },
+    { value: 'container', label: 'Container' },
+    { value: 'video_codec', label: 'Video Codec' },
+    { value: 'audio_codec', label: 'Audio Codec' },
+    { value: 'resolution', label: 'Resolution' },
+    { value: 'bitrate', label: 'Bitrate' },
+    { value: 'size', label: 'Size' },
+    { value: 'duration', label: 'Duration' },
+    { value: 'critic_rating', label: 'Critic Rating' },
+    { value: 'audience_rating', label: 'Audience Rating' },
+];
 
 async function populateServers() {
     try {
@@ -20,30 +40,44 @@ async function populateServers() {
     }
 }
 
-function sortAndRender() {
-    const property = document.getElementById('sort-property').value;
-    const direction = document.getElementById('sort-direction').value;
+function sortAndRender(sortConfig) {
     const remoteList = document.getElementById('remote-only-list');
+    const countSpan = document.getElementById('item-count');
 
-    if (currentRemoteMovies.length === 0) return;
+    if (currentFilteredMovies.length === 0) {
+        if (countSpan) countSpan.textContent = '0';
+        remoteList.innerHTML = '<p>No movies match the selected filters.</p>';
+        return;
+    }
 
-    const sortedMovies = [...currentRemoteMovies].sort((a, b) => {
-        let valA = a[property];
-        let valB = b[property];
+    if (countSpan) countSpan.textContent = currentFilteredMovies.length;
 
-        // Handle strings (titles)
-        if (typeof valA === 'string') {
-            valA = valA.toLowerCase();
-            valB = valB.toLowerCase();
-        }
+    const sortedMovies = [...currentFilteredMovies];
+    
+    if (sortConfig) {
+        sortedMovies.sort((a, b) => {
+            let valA = a[sortConfig.property];
+            let valB = b[sortConfig.property];
 
-        if (valA < valB) return direction === 'asc' ? -1 : 1;
-        if (valA > valB) return direction === 'asc' ? 1 : -1;
-        return 0;
-    });
+            // Handle strings (titles)
+            if (typeof valA === 'string') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
 
     remoteList.innerHTML = '';
     sortedMovies.forEach(m => remoteList.appendChild(createMovieCard(m, currentServerId)));
+}
+
+function handleFilterChange(rootGroup, sortConfig) {
+    currentFilteredMovies = currentRemoteMovies.filter(movie => rootGroup.apply(movie));
+    sortAndRender(sortConfig);
 }
 
 async function startComparison() {
@@ -55,6 +89,9 @@ async function startComparison() {
         alert('Please select a server first');
         return;
     }
+
+    // Update URL with server selection
+    FilterPanel.patchURL('server', id);
 
     currentServerId = id;
     const view = document.getElementById('comparison-view');
@@ -73,11 +110,15 @@ async function startComparison() {
         const data = await response.json();
 
         currentRemoteMovies = data.remote_only || [];
+        currentFilteredMovies = [...currentRemoteMovies];
         remoteList.innerHTML = '';
 
         if (currentRemoteMovies.length > 0) {
             sortControls.style.display = 'flex';
-            sortAndRender();
+            sortAndRender({
+                property: filterPanel.sortProperty,
+                direction: filterPanel.sortDirection
+            });
         } else {
             remoteList.innerHTML = '<p>Nothing unique found on the remote server.</p>';
         }
@@ -87,7 +128,38 @@ async function startComparison() {
     }
 }
 
+function init() {
+    const populatePromise = populateServers();
+    if (!filterPanel) {
+        filterPanel = new FilterPanel('filter-container', movieProperties, handleFilterChange);
+    }
+
+    // Check if we should start comparison from URL
+    const params = new URLSearchParams(window.location.search);
+    const serverId = params.get('server');
+    if (serverId) {
+        populatePromise.then(() => {
+            const selector = document.getElementById('server-selector');
+            selector.value = serverId;
+            if (selector.value) {
+                startComparison();
+            }
+        });
+    }
+
+    window.addEventListener('popstate', () => {
+        const params = new URLSearchParams(window.location.search);
+        const serverId = params.get('server');
+        const selector = document.getElementById('server-selector');
+        if (serverId && selector.value !== serverId) {
+            selector.value = serverId;
+            startComparison();
+        } else if (!serverId && selector.value) {
+            selector.value = '';
+            document.getElementById('comparison-view').style.display = 'none';
+        }
+    });
+}
+
 document.getElementById('compare-btn').addEventListener('click', startComparison);
-document.getElementById('sort-property').addEventListener('change', sortAndRender);
-document.getElementById('sort-direction').addEventListener('change', sortAndRender);
-document.addEventListener('DOMContentLoaded', populateServers);
+document.addEventListener('DOMContentLoaded', init);

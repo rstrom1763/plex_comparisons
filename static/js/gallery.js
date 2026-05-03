@@ -131,6 +131,80 @@ export function openVideoPlayer(hash, title, videoCodec, audioCodec) {
     modal.style.display = 'flex';
 }
 
+import { FilterPanel } from '/static/js/filter.js';
+
+let allMovies = [];
+let filterPanel = null;
+
+const movieProperties = [
+    { value: 'title', label: 'Title' },
+    { value: 'year', label: 'Year' },
+    { value: 'rating', label: 'Content Rating' },
+    { value: 'genre', label: 'Genre' },
+    { value: 'library', label: 'Library' },
+    { value: 'container', label: 'Container' },
+    { value: 'video_codec', label: 'Video Codec' },
+    { value: 'audio_codec', label: 'Audio Codec' },
+    { value: 'resolution', label: 'Resolution' },
+    { value: 'bitrate', label: 'Bitrate' },
+    { value: 'size', label: 'Size' },
+    { value: 'duration', label: 'Duration' },
+    { value: 'critic_rating', label: 'Critic Rating' },
+    { value: 'audience_rating', label: 'Audience Rating' },
+];
+
+/**
+ * Renders the gallery with filtered movies.
+ * @param {Array} movies 
+ */
+function renderGallery(movies) {
+    const gallery = document.getElementById('movie-gallery');
+    if (!gallery) return;
+
+    const countSpan = document.getElementById('item-count');
+    if (countSpan) {
+        countSpan.textContent = movies.length;
+    }
+
+    gallery.innerHTML = '';
+    if (movies.length === 0) {
+        gallery.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">No movies match the selected filters.</p>';
+        return;
+    }
+
+    movies.forEach(movie => {
+        const card = createMovieCard(movie);
+        gallery.appendChild(card);
+    });
+}
+
+/**
+ * Handles filter and sort changes.
+ * @param {FilterGroup} rootGroup 
+ * @param {Object} sortConfig
+ */
+function handleFilterChange(rootGroup, sortConfig) {
+    let filteredMovies = allMovies.filter(movie => rootGroup.apply(movie));
+    
+    if (sortConfig) {
+        filteredMovies.sort((a, b) => {
+            let valA = a[sortConfig.property];
+            let valB = b[sortConfig.property];
+
+            if (typeof valA === 'string') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+    
+    renderGallery(filteredMovies);
+}
+
 /**
  * Fetches movies from the API and populates the gallery.
  */
@@ -144,15 +218,25 @@ async function loadGallery() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        // Note: The server sends gzipped JSON, but the browser handles decompression automatically
-        const movies = await response.json();
+        allMovies = await response.json();
         
-        gallery.innerHTML = ''; // Clear loading state if any
-        
-        movies.forEach(movie => {
-            const card = createMovieCard(movie);
-            gallery.appendChild(card);
-        });
+        // Initialize Filter Panel
+        if (!filterPanel) {
+            const filterContainer = document.getElementById('filter-container');
+            if (filterContainer) {
+                filterPanel = new FilterPanel('filter-container', movieProperties, handleFilterChange);
+            }
+        }
+
+        // Apply initial sort if filterPanel exists
+        if (filterPanel) {
+            handleFilterChange(filterPanel.rootGroup, {
+                property: filterPanel.sortProperty,
+                direction: filterPanel.sortDirection
+            });
+        } else {
+            renderGallery(allMovies);
+        }
     } catch (error) {
         console.error('Failed to load movies:', error);
         gallery.innerHTML = `<p style="color: red; text-align: center;">Error loading movies: ${error.message}</p>`;
