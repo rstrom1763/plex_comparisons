@@ -134,7 +134,7 @@
 </head>
 <body>
     <nav id="main-nav"></nav>
-    <h1>Duplicate Movies</h1>
+    <h1>Duplicate Media</h1>
     
     <div class="content-block comparison-header">
         <div id="sort-controls" class="control-group">
@@ -144,6 +144,7 @@
                 <option value="year">Year</option>
                 <option value="versions">Versions Count</option>
                 <option value="wasted">Wasted Space</option>
+                <option value="quality_score">Quality Score</option>
             </select>
             <label for="sort-direction">Order:</label>
             <select id="sort-direction">
@@ -216,21 +217,22 @@
                 const detailsDiv = document.createElement('div');
                 detailsDiv.className = 'duplicate-details';
                 
+                const displayTitle = `${group[0].title} (${group[0].year})`;
                 const title = document.createElement('h2');
-                title.textContent = `${group[0].title} (${group[0].year})`;
+                title.textContent = displayTitle;
                 detailsDiv.appendChild(title);
 
                 const stats = document.createElement('div');
                 stats.className = 'file-meta';
                 stats.style.marginBottom = '10px';
                 stats.style.color = 'var(--primary-light)';
-                stats.textContent = `${group.length} versions found`;
+                stats.textContent = `Movie | ${group.length} versions found`;
                 detailsDiv.appendChild(stats);
 
                 const fileList = document.createElement('ul');
                 fileList.className = 'file-list';
 
-                group.forEach(movie => {
+                group.forEach(item => {
                     const li = document.createElement('li');
                     li.className = 'file-item';
                     
@@ -244,11 +246,11 @@
                     playBtn.className = 'file-play-btn';
                     playBtn.innerHTML = '▶ Play';
                     playBtn.title = 'Play Preview';
-                    playBtn.onclick = () => openVideoPlayer(movie.hash, group[0].title, movie.video_codec, movie.audio_codec);
+                    playBtn.onclick = () => openVideoPlayer(item.hash, displayTitle, item.video_codec, item.audio_codec);
                     
                     const path = document.createElement('span');
                     path.className = 'file-path';
-                    path.textContent = movie.file;
+                    path.textContent = item.file;
                     
                     header.appendChild(playBtn);
                     header.appendChild(path);
@@ -256,7 +258,8 @@
                     const meta = document.createElement('div');
                     meta.className = 'file-meta';
                     meta.style.paddingLeft = '55px'; // Align with path text
-                    meta.textContent = `${movie.resolution} | ${movie.video_codec} | ${formatSize(movie.size)} | Hash: ${movie.hash || 'N/A'}`;
+                    const qualityScore = (item.quality_score || 0).toFixed(2);
+                    meta.textContent = `${item.resolution} | ${item.video_codec} | ${formatSize(item.size)} | Quality Score: ${qualityScore} | Hash: ${item.hash || 'N/A'}`;
                     
                     fileInfo.appendChild(header);
                     fileInfo.appendChild(meta);
@@ -268,7 +271,7 @@
                     const deleteFileBtn = document.createElement('button');
                     deleteFileBtn.className = 'file-delete-btn';
                     deleteFileBtn.textContent = 'Delete File';
-                    deleteFileBtn.onclick = () => deleteFile(movie.hash, movie.file);
+                    deleteFileBtn.onclick = () => deleteFile(item.hash, item.file);
 
                     actions.appendChild(deleteFileBtn);
                     li.appendChild(actions);
@@ -397,6 +400,13 @@
                     };
                     valA = calcWasted(a);
                     valB = calcWasted(b);
+                } else if (property === 'quality_score') {
+                    // For quality score, we use the max quality score in the group
+                    valA = Math.max(...a.map(m => m.quality_score || 0));
+                    valB = Math.max(...b.map(m => m.quality_score || 0));
+                } else if (property === 'title') {
+                    valA = a[0].title;
+                    valB = b[0].title;
                 } else {
                     valA = a[0][property];
                     valB = b[0][property];

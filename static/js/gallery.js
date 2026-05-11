@@ -31,6 +31,7 @@ export function createMovieCard(movie, serverId = null) {
                 <div class="metadata-label">Codec</div><div>${movie.video_codec || 'N/A'}</div>
                 <div class="metadata-label">Size</div><div>${formatSize(movie.size)}</div>
                 <div class="metadata-label">Duration</div><div>${formatDuration(movie.duration)}</div>
+                <div class="metadata-label">Quality Score</div><div>${(movie.quality_score || 0).toFixed(2)}</div>
                 <div class="metadata-label">Critic</div><div>${(movie.critic_rating || 0).toFixed(1)}</div>
                 <div class="metadata-label">Audience</div><div>${(movie.audience_rating || 0).toFixed(1)}</div>
                 <div class="metadata-label">Hash</div><div style="font-family: monospace; font-size: 0.8em; word-break: break-all;">${movie.hash || 'N/A'}</div>
@@ -69,7 +70,7 @@ export function openVideoPlayer(hash, title, videoCodec, audioCodec) {
                     <span class="close-modal">&times;</span>
                 </div>
                 <div class="video-container">
-                    <video id="video-player" controls autoplay preload="metadata">
+                    <video id="video-player" controls autoplay preload="metadata" controlsList="nodownload" oncontextmenu="return false;">
                         Your browser does not support the video tag.
                     </video>
                 </div>
@@ -129,6 +130,7 @@ const movieProperties = [
     { value: 'duration', label: 'Duration' },
     { value: 'critic_rating', label: 'Critic Rating' },
     { value: 'audience_rating', label: 'Audience Rating' },
+    { value: 'quality_score', label: 'Quality Score' },
 ];
 
 /**

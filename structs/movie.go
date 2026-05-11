@@ -34,6 +34,7 @@ type Movie struct {
 	CriticRating   float64 `json:"critic_rating"`   // metadata_items.rating
 	AudienceRating float64 `json:"audience_rating"` // metadata_items.audience_rating
 	MetadataHash   string  `json:"metadata_hash"`   // metadata_items.hash
+	QualityScore   float64 `json:"quality_score"`   // computed field
 }
 
 func (m *Movie) GetTitle() string {
@@ -70,6 +71,7 @@ func (m *Movie) ToCSV() string {
 		strconv.FormatFloat(m.CriticRating, 'f', 1, 64),
 		strconv.FormatFloat(m.AudienceRating, 'f', 1, 64),
 		m.MetadataHash,
+		strconv.FormatFloat(m.QualityScore, 'f', 2, 64),
 	}
 
 	// Escape commas or quotes by wrapping each field in quotes if necessary
@@ -87,7 +89,41 @@ func (m *Movie) ToCSV() string {
 }
 
 func (m *Movie) CSVHeaders() string {
-	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash\n"
+	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash,quality_score\n"
+}
+
+func (m *Movie) CalculateQualityScore() {
+	// Base bitrate in kbps
+	score := float64(m.Bitrate)
+
+	// Resolution factor (relative to SD 720x480)
+	sdPixels := 720.0 * 480.0
+	currentPixels := float64(m.Width * m.Height)
+	if currentPixels > 0 {
+		resolutionFactor := currentPixels / sdPixels
+		// Divide by resolution factor to get "bitrate density"
+		// A higher resolution requires proportionally more bitrate to maintain quality
+		score /= resolutionFactor
+	}
+
+	// Codec multiplier (efficiency)
+	codecMultiplier := 1.0
+	switch strings.ToLower(m.VideoCodec) {
+	case "hevc", "h265", "x265":
+		codecMultiplier = 2.0
+	case "av1":
+		codecMultiplier = 2.5
+	case "h264", "x264":
+		codecMultiplier = 1.0
+	case "mpeg4", "divx", "xvid":
+		codecMultiplier = 0.8
+	case "vc1":
+		codecMultiplier = 0.9
+	}
+	score *= codecMultiplier
+
+	// Scale score to a more readable range
+	m.QualityScore = math.Round(score/1000*100) / 100
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
@@ -156,6 +192,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
 			MetadataHash:   MetadataHash,
 		}
+		movie.CalculateQualityScore()
 
 		movies = append(movies, &movie)
 
@@ -178,7 +215,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 	}(file)
 
 	csvReader := csv.NewReader(file)
-	csvReader.FieldsPerRecord = 20
+	csvReader.FieldsPerRecord = 21
 
 	var movies []*Movie
 	row := 0
@@ -194,7 +231,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 		row++
 
 		// Skip header row
-		if row == 1 && len(record) == 20 &&
+		if row == 1 &&
 			strings.EqualFold(strings.TrimSpace(record[0]), "title") &&
 			strings.EqualFold(strings.TrimSpace(record[1]), "rating") {
 			continue
@@ -255,6 +292,11 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 			return nil, fmt.Errorf("invalid audience_rating on row %d: %w", row, err)
 		}
 
+		qualityScore, err := atof(record[20])
+		if err != nil {
+			return nil, fmt.Errorf("invalid quality_score on row %d: %w", row, err)
+		}
+
 		movie := &Movie{
 			Title:          trim(record[0]),
 			ContentRating:  trim(record[1]),
@@ -276,6 +318,11 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 			CriticRating:   math.Round(criticRating*10) / 10,
 			AudienceRating: math.Round(audienceRating*10) / 10,
 			MetadataHash:   trim(record[19]),
+			QualityScore:   qualityScore,
+		}
+
+		if len(record) <= 20 {
+			movie.CalculateQualityScore()
 		}
 
 		movies = append(movies, movie)

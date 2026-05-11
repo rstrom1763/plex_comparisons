@@ -21,6 +21,7 @@ const movieProperties = [
     { value: 'duration', label: 'Duration' },
     { value: 'critic_rating', label: 'Critic Rating' },
     { value: 'audience_rating', label: 'Audience Rating' },
+    { value: 'quality_score', label: 'Quality Score' },
 ];
 
 async function populateServers() {

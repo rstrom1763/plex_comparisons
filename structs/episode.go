@@ -37,6 +37,7 @@ type Episode struct {
 	CriticRating   float64 `json:"critic_rating"`
 	AudienceRating float64 `json:"audience_rating"`
 	MetadataHash   string  `json:"metadata_hash"`
+	QualityScore   float64 `json:"quality_score"` // computed field
 }
 
 func (e *Episode) GetTitle() string {
@@ -75,6 +76,7 @@ func (e *Episode) ToCSV() string {
 		strconv.FormatFloat(e.CriticRating, 'f', 1, 64),
 		strconv.FormatFloat(e.AudienceRating, 'f', 1, 64),
 		e.MetadataHash,
+		strconv.FormatFloat(e.QualityScore, 'f', 2, 64),
 	}
 
 	for i, field := range fields {
@@ -88,7 +90,41 @@ func (e *Episode) ToCSV() string {
 }
 
 func (e *Episode) CSVHeaders() string {
-	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash\n"
+	return "show_title,season_number,episode_number,episode_title,rating,year,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash,quality_score\n"
+}
+
+func (e *Episode) CalculateQualityScore() {
+	// Base bitrate in kbps
+	score := float64(e.Bitrate)
+
+	// Resolution factor (relative to SD 720x480)
+	sdPixels := 720.0 * 480.0
+	currentPixels := float64(e.Width * e.Height)
+	if currentPixels > 0 {
+		resolutionFactor := currentPixels / sdPixels
+		// Divide by resolution factor to get "bitrate density"
+		// A higher resolution requires proportionally more bitrate to maintain quality
+		score /= resolutionFactor
+	}
+
+	// Codec multiplier (efficiency)
+	codecMultiplier := 1.0
+	switch strings.ToLower(e.VideoCodec) {
+	case "hevc", "h265", "x265":
+		codecMultiplier = 2.0
+	case "av1":
+		codecMultiplier = 2.5
+	case "h264", "x264":
+		codecMultiplier = 1.0
+	case "mpeg4", "divx", "xvid":
+		codecMultiplier = 0.8
+	case "vc1":
+		codecMultiplier = 0.9
+	}
+	score *= codecMultiplier
+
+	// Scale score to a more readable range
+	e.QualityScore = math.Round(score/1000*100) / 100
 }
 
 func GetEpisodes(db *sql.DB) ([]*Episode, error) {
@@ -163,6 +199,7 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 			AudienceRating: math.Round(float64(AudienceRating)*10) / 10,
 			MetadataHash:   MetadataHash,
 		}
+		e.CalculateQualityScore()
 		episodes = append(episodes, e)
 	}
 
@@ -181,8 +218,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 	}()
 
 	r := csv.NewReader(f)
-	// Expect exactly 22 columns
-	r.FieldsPerRecord = 22
+	r.FieldsPerRecord = 23
 
 	var episodes []*Episode
 	row := 0
@@ -218,7 +254,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		row++
 
 		// Skip header row if present
-		if row == 1 && len(rec) == 22 &&
+		if row == 1 &&
 			strings.EqualFold(trim(rec[0]), "show_title") &&
 			strings.EqualFold(trim(rec[1]), "season_number") &&
 			strings.EqualFold(trim(rec[2]), "episode_number") {
@@ -266,6 +302,11 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 			return nil, fmt.Errorf("invalid audience_rating on row %d: %w", row, err)
 		}
 
+		qualityScore, err := atof(rec[22])
+		if err != nil {
+			return nil, fmt.Errorf("invalid quality_score on row %d: %w", row, err)
+		}
+
 		e := &Episode{
 			ShowTitle:      trim(rec[0]),
 			SeasonNumber:   season,
@@ -289,6 +330,11 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 			CriticRating:   math.Round(criticRating*10) / 10,
 			AudienceRating: math.Round(audienceRating*10) / 10,
 			MetadataHash:   trim(rec[21]),
+			QualityScore:   qualityScore,
+		}
+
+		if len(rec) <= 22 {
+			e.CalculateQualityScore()
 		}
 
 		episodes = append(episodes, e)
