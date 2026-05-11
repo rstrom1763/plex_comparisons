@@ -33,11 +33,18 @@
     </div>
 
     <script src="/static/js/gallery.js" type="module"></script>
-    <script>
+    <script type="module">
+        import { getCookie, authenticatedFetch, handleFetchError } from '/static/js/utils.js';
+
         async function logout() {
-            await fetch('/logout', { method: 'POST' });
-            window.location.href = '/login';
+            const resp = await authenticatedFetch('/logout', { method: 'POST' });
+            if (resp.ok) {
+                window.location.href = '/login';
+            } else {
+                await handleFetchError(resp, 'logout');
+            }
         }
+        window.logout = logout;
     </script>
 </body>
 </html>

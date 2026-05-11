@@ -178,7 +178,8 @@
     </div>
 
     <script type="module">
-        import { formatSize, openVideoPlayer } from '/static/js/gallery.js';
+        import { formatSize, authenticatedFetch } from '/static/js/utils.js';
+        import { openVideoPlayer } from '/static/js/gallery.js';
 
         let duplicateGroups = [];
 
@@ -438,9 +439,11 @@
             if (!confirm(`Are you sure you want to delete this file?\n\n${path}`)) return;
             
             try {
-                const response = await fetch('/api/file', {
+                const response = await authenticatedFetch('/api/file', {
                     method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ hash, path })
                 });
                 const result = await response.json();
@@ -451,6 +454,8 @@
                 alert(`Error: ${error.message}`);
             }
         }
+
+        window.deleteFile = deleteFile;
 
         loadDuplicates();
     </script>

@@ -41,9 +41,12 @@
         <p><a href="/" style="color: var(--accent-color); text-decoration: none;">&larr; Back to Home</a></p>
     </div>
 
-    <script>
+    <script type="module">
+        import { getCookie, authenticatedFetch, handleFetchError } from '/static/js/utils.js';
+
         async function loadTrustedServers() {
             const resp = await fetch('/api/trusted-servers');
+            if (!resp.ok) return await handleFetchError(resp, 'load servers');
             const servers = await resp.json();
             const list = document.getElementById('serversList');
             list.innerHTML = '<h3 style="text-align: left; margin-top: 30px;">Active Trusted Servers</h3>';
@@ -62,21 +65,23 @@
             const name = document.getElementById('newServerName').value;
             if (!name) return alert('Enter a name');
             
-            const resp = await fetch('/api/trusted-servers', {
+            const resp = await authenticatedFetch('/api/trusted-servers', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({ name })
             });
-            const data = await resp.json();
             
             if (resp.ok) {
+                const data = await resp.json();
                 document.getElementById('generatedToken').innerText = data.token;
                 document.getElementById('tokenResult').style.display = 'block';
                 document.getElementById('newServerName').value = '';
                 document.getElementById('copyBtn').innerText = 'Copy';
                 loadTrustedServers();
             } else {
-                alert(data.error);
+                await handleFetchError(resp, 'add trusted server');
             }
         }
 
@@ -96,9 +101,20 @@
 
         async function deleteServer(id) {
             if (!confirm('Are you sure you want to revoke access?')) return;
-            await fetch(`/api/trusted-servers/${id}`, { method: 'DELETE' });
-            loadTrustedServers();
+            const resp = await authenticatedFetch(`/api/trusted-servers/${id}`, { 
+                method: 'DELETE'
+            });
+            if (resp.ok) {
+                loadTrustedServers();
+            } else {
+                await handleFetchError(resp, 'revoke access');
+            }
         }
+
+        // Expose to global scope for onclick handlers
+        window.addTrustedServer = addTrustedServer;
+        window.copyToClipboard = copyToClipboard;
+        window.deleteServer = deleteServer;
 
         loadTrustedServers();
     </script>
