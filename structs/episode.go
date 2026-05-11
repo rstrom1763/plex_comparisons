@@ -95,36 +95,68 @@ func (e *Episode) CSVHeaders() string {
 
 func (e *Episode) CalculateQualityScore() {
 	// Base bitrate in kbps
-	score := float64(e.Bitrate)
-
-	// Resolution factor (relative to SD 720x480)
-	sdPixels := 720.0 * 480.0
-	currentPixels := float64(e.Width * e.Height)
-	if currentPixels > 0 {
-		resolutionFactor := currentPixels / sdPixels
-		// Divide by resolution factor to get "bitrate density"
-		// A higher resolution requires proportionally more bitrate to maintain quality
-		score /= resolutionFactor
+	bitrate := float64(e.Bitrate)
+	if bitrate <= 0 {
+		e.QualityScore = 0
+		return
 	}
 
-	// Codec multiplier (efficiency)
+	// 1. Resolution Scaling with Diminishing Returns
+	// Using a power function (exponent 0.7) to model that increasing resolution
+	// requires more bitrate, but not linearly for perceived quality.
+	sdPixels := 720.0 * 480.0
+	currentPixels := float64(e.Width * e.Height)
+	resolutionFactor := 1.0
+	if currentPixels > 0 {
+		resolutionFactor = math.Pow(currentPixels/sdPixels, 0.7)
+	}
+
+	// Calculate bitrate density (bits per relative pixel unit)
+	score := bitrate / resolutionFactor
+
+	// 2. Codec Efficiency Multipliers
+	// HEVC is ~50% more efficient than H.264, AV1 is ~30% more efficient than HEVC.
 	codecMultiplier := 1.0
 	switch strings.ToLower(e.VideoCodec) {
+	case "av1":
+		codecMultiplier = 2.6 // Relative to H.264
 	case "hevc", "h265", "x265":
 		codecMultiplier = 2.0
-	case "av1":
-		codecMultiplier = 2.5
+	case "vp9":
+		codecMultiplier = 1.8
 	case "h264", "x264":
 		codecMultiplier = 1.0
-	case "mpeg4", "divx", "xvid":
-		codecMultiplier = 0.8
 	case "vc1":
 		codecMultiplier = 0.9
+	case "mpeg4", "divx", "xvid":
+		codecMultiplier = 0.7
+	case "mpeg2video", "mpeg2":
+		codecMultiplier = 0.6
+	default:
+		codecMultiplier = 1.0
 	}
 	score *= codecMultiplier
 
-	// Scale score to a more readable range
-	e.QualityScore = math.Round(score/1000*100) / 100
+	// 3. Bit Depth Bonus
+	if strings.Contains(strings.ToLower(e.VideoCodec), "10") {
+		score *= 1.1
+	}
+
+	// 4. Audio Quality Component (Small weight)
+	audioBonus := 1.0
+	switch strings.ToLower(e.AudioCodec) {
+	case "dca", "dts", "dts-hd", "truehd", "flac":
+		audioBonus = 1.1
+	case "ac3", "eac3", "aac":
+		audioBonus = 1.05
+	case "mp3", "vorbis", "opus":
+		audioBonus = 1.0
+	}
+	score *= audioBonus
+
+	// Final Scaling: Normalize to a range where a good 1080p HEVC encode
+	// (e.g. 5Mbps) gets a score around 10.
+	e.QualityScore = math.Round(score/300*100) / 100
 }
 
 func GetEpisodes(db *sql.DB) ([]*Episode, error) {

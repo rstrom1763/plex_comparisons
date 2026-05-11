@@ -94,36 +94,75 @@ func (m *Movie) CSVHeaders() string {
 
 func (m *Movie) CalculateQualityScore() {
 	// Base bitrate in kbps
-	score := float64(m.Bitrate)
-
-	// Resolution factor (relative to SD 720x480)
-	sdPixels := 720.0 * 480.0
-	currentPixels := float64(m.Width * m.Height)
-	if currentPixels > 0 {
-		resolutionFactor := currentPixels / sdPixels
-		// Divide by resolution factor to get "bitrate density"
-		// A higher resolution requires proportionally more bitrate to maintain quality
-		score /= resolutionFactor
+	bitrate := float64(m.Bitrate)
+	if bitrate <= 0 {
+		m.QualityScore = 0
+		return
 	}
 
-	// Codec multiplier (efficiency)
+	// 1. Resolution Scaling with Diminishing Returns
+	// Using a power function (exponent 0.7) to model that increasing resolution
+	// requires more bitrate, but not linearly for perceived quality.
+	sdPixels := 720.0 * 480.0
+	currentPixels := float64(m.Width * m.Height)
+	resolutionFactor := 1.0
+	if currentPixels > 0 {
+		resolutionFactor = math.Pow(currentPixels/sdPixels, 0.7)
+	}
+
+	// Calculate bitrate density (bits per relative pixel unit)
+	score := bitrate / resolutionFactor
+
+	// 2. Codec Efficiency Multipliers
+	// HEVC is ~50% more efficient than H.264, AV1 is ~30% more efficient than HEVC.
 	codecMultiplier := 1.0
 	switch strings.ToLower(m.VideoCodec) {
+	case "av1":
+		codecMultiplier = 2.6 // Relative to H.264
 	case "hevc", "h265", "x265":
 		codecMultiplier = 2.0
-	case "av1":
-		codecMultiplier = 2.5
+	case "vp9":
+		codecMultiplier = 1.8
 	case "h264", "x264":
 		codecMultiplier = 1.0
-	case "mpeg4", "divx", "xvid":
-		codecMultiplier = 0.8
 	case "vc1":
 		codecMultiplier = 0.9
+	case "mpeg4", "divx", "xvid":
+		codecMultiplier = 0.7
+	case "mpeg2video", "mpeg2":
+		codecMultiplier = 0.6
+	default:
+		codecMultiplier = 1.0
 	}
 	score *= codecMultiplier
 
-	// Scale score to a more readable range
-	m.QualityScore = math.Round(score/1000*100) / 100
+	// 3. Bit Depth Bonus
+	// 10-bit color reduces banding and improves efficiency even for 8-bit content.
+	// We can't always detect it from the codec name alone in Plex metadata,
+	// but some containers or codec strings might imply it.
+	// If the codec string contains "10", we give a 10% bonus.
+	if strings.Contains(strings.ToLower(m.VideoCodec), "10") {
+		score *= 1.1
+	}
+
+	// 4. Audio Quality Component (Small weight)
+	// High-fidelity audio adds to the overall experience.
+	audioBonus := 1.0
+	switch strings.ToLower(m.AudioCodec) {
+	case "dca", "dts", "dts-hd", "truehd", "flac":
+		audioBonus = 1.1 // 10% bonus for lossless or high-end lossy
+	case "ac3", "eac3", "aac":
+		audioBonus = 1.05 // 5% bonus for standard lossy
+	case "mp3", "vorbis", "opus":
+		audioBonus = 1.0
+	}
+	score *= audioBonus
+
+	// Final Scaling: Normalize to a range where a good 1080p HEVC encode
+	// (e.g. 5Mbps) gets a score around 10.
+	// Score = (5000 / (1920*1080 / 720*480)^0.7) * 2.0 * 1.05 = (5000 / 3.32) * 2.0 * 1.05 = 3162
+	// So we divide by 300 to get ~10.
+	m.QualityScore = math.Round(score/300*100) / 100
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
