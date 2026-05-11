@@ -217,7 +217,11 @@ async function loadGallery() {
         }
     } catch (error) {
         console.error('Failed to load movies:', error);
-        gallery.innerHTML = `<p style="color: red; text-align: center;">Error loading movies: ${error.message}</p>`;
+        gallery.innerHTML = `
+            <div class="spinner-container">
+                <p style="color: #ff4d4d; text-align: center;">Error loading movies: ${error.message}</p>
+            </div>
+        `;
     }
 }
 

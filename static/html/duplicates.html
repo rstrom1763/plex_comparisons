@@ -170,7 +170,10 @@
 
     <div id="duplicates-container" style="max-width: 1000px; margin: 0 auto;">
         <!-- Duplicates will be loaded here -->
-        <p style="text-align: center;">Loading duplicates...</p>
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <p class="loading-text">Scanning for duplicates...</p>
+        </div>
     </div>
 
     <script src="/static/js/navbar.js" type="module"></script>
@@ -420,7 +423,11 @@
                 duplicateGroups = await response.json();
                 sortAndRender();
             } catch (error) {
-                container.innerHTML = `<p style="color: red; text-align: center;">Error: ${error.message}</p>`;
+                container.innerHTML = `
+                    <div class="spinner-container">
+                        <p style="color: #ff4d4d; text-align: center;">Error: ${error.message}</p>
+                    </div>
+                `;
             }
         }
 

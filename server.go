@@ -583,6 +583,10 @@ func RunServer() error {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if server.Token == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "shared token is required"})
+			return
+		}
 		if err := localDAO.AddServer(server); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -653,6 +657,10 @@ func RunServer() error {
 		var server structs.Server
 		if err := c.ShouldBindJSON(&server); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if server.Token == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "shared token is required"})
 			return
 		}
 		server.ID = id

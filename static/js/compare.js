@@ -101,7 +101,12 @@ async function startComparison() {
 
     view.style.display = 'block';
     title.innerText = `Comparing with ${name}...`;
-    remoteList.innerHTML = 'Loading...';
+    remoteList.innerHTML = `
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <p class="loading-text">Requesting remote server data...</p>
+        </div>
+    `;
     sortControls.style.display = 'none';
 
     try {
@@ -124,7 +129,11 @@ async function startComparison() {
         }
     } catch (error) {
         console.error(error);
-        remoteList.innerHTML = `<p style="color: red">Error: ${error.message}</p>`;
+        remoteList.innerHTML = `
+            <div class="spinner-container">
+                <p style="color: #ff4d4d">Error: ${error.message}</p>
+            </div>
+        `;
     }
 }
 

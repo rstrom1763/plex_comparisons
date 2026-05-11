@@ -13,8 +13,11 @@ async function fetchServers() {
         const li = document.createElement('li');
         li.className = 'server-item';
         li.innerHTML = `
-            <span><strong>${server.name}</strong> (${server.address})</span>
-            <div style="display: flex; gap: 10px;">
+            <div style="flex-grow: 1;">
+                <strong>${server.name}</strong> (${server.address})
+                ${server.token ? '<br><small style="color: var(--accent-color);">Token configured</small>' : '<br><small style="color: #ff4444;">No token configured</small>'}
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="btn btn-primary btn-edit" data-id="${server.id}">Edit</button>
                 <button class="btn btn-danger btn-delete" data-id="${server.id}">Delete</button>
             </div>
@@ -39,6 +42,7 @@ function startEdit(id) {
     document.getElementById('server-id').value = server.id;
     document.getElementById('server-name').value = server.name;
     document.getElementById('server-address').value = server.address;
+    document.getElementById('server-token').value = server.token || '';
     document.getElementById('submit-btn').textContent = 'Update Server';
     document.getElementById('cancel-edit').style.display = 'inline-block';
 }
@@ -56,6 +60,7 @@ async function handleFormSubmit(e) {
     const id = document.getElementById('server-id').value;
     const name = document.getElementById('server-name').value;
     const address = document.getElementById('server-address').value;
+    const token = document.getElementById('server-token').value;
 
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/servers/${id}` : '/api/servers';
@@ -65,7 +70,7 @@ async function handleFormSubmit(e) {
         headers: { 
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name, address })
+        body: JSON.stringify({ name, address, token })
     });
 
     if (response.ok) {
