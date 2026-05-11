@@ -7,13 +7,7 @@
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
-    <nav>
-        <a href="/compare">Compare Servers</a>
-        <a href="/duplicates">Duplicates</a>
-        <a href="/add-server">Manage Servers</a>
-        <a href="/trusted-servers">Trusted Servers</a>
-        <a href="#" onclick="logout(); return false;" style="margin-left: 10px;">Logout</a>
-    </nav>
+    <nav id="main-nav"></nav>
     <h1>Movie Gallery</h1>
     <div class="main-container">
         <div class="gallery-container">
@@ -33,18 +27,6 @@
     </div>
 
     <script src="/static/js/gallery.js" type="module"></script>
-    <script type="module">
-        import { getCookie, authenticatedFetch, handleFetchError } from '/static/js/utils.js';
-
-        async function logout() {
-            const resp = await authenticatedFetch('/logout', { method: 'POST' });
-            if (resp.ok) {
-                window.location.href = '/login';
-            } else {
-                await handleFetchError(resp, 'logout');
-            }
-        }
-        window.logout = logout;
-    </script>
+    <script src="/static/js/navbar.js" type="module"></script>
 </body>
 </html>

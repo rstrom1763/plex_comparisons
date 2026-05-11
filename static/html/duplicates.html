@@ -133,11 +133,7 @@
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/movies/gallery">← Back to Gallery</a>
-        <a href="/compare">Compare Servers</a>
-        <a href="/add-server">Manage Servers</a>
-    </nav>
+    <nav id="main-nav"></nav>
     <h1>Duplicate Movies</h1>
     
     <div class="content-block comparison-header">
@@ -177,6 +173,7 @@
         <p style="text-align: center;">Loading duplicates...</p>
     </div>
 
+    <script src="/static/js/navbar.js" type="module"></script>
     <script type="module">
         import { formatSize, authenticatedFetch } from '/static/js/utils.js';
         import { openVideoPlayer } from '/static/js/gallery.js';

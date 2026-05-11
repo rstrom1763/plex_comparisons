@@ -6,22 +6,19 @@
     <title>Trusted Servers - Plex Comparison</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <style>
-        .container { max-width: 800px; margin: 20px auto; color: var(--text-color); }
-        .server-item { background: var(--card-bg); padding: 15px; margin: 10px 0; border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow); border: 1px solid rgba(255, 255, 255, 0.05); }
         .token-display { background: #000; padding: 10px; font-family: monospace; border: 1px solid var(--primary-light); flex-grow: 1; word-break: break-all; margin-right: 10px; border-radius: 4px; color: var(--accent-color); }
         .token-container { display: flex; align-items: center; margin-top: 10px; }
         .copy-btn { background: var(--primary-color); color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: var(--transition); }
         .copy-btn:hover { background: var(--primary-light); }
-        .delete-btn { background: #8b2626; color: white; margin-left: 10px; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: var(--transition); }
-        .delete-btn:hover { background: #b33a3a; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        .input-group input { flex-grow: 1; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
+        .input-group input { flex-grow: 1; max-width: 400px; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <nav id="main-nav"></nav>
+    <div class="content-block" style="max-width: 1000px; margin: 0 auto;">
         <h1>Trusted Servers</h1>
-        <p>Configure tokens for remote servers to authenticate with this server.</p>
+        <p style="text-align: center; margin-bottom: 30px;">Configure tokens for remote servers to authenticate with this server.</p>
         
         <div class="input-group">
             <input type="text" id="newServerName" placeholder="Server Name (e.g. MyRemoteServer)">
@@ -37,10 +34,9 @@
         </div>
 
         <div id="serversList"></div>
-        
-        <p><a href="/" style="color: var(--accent-color); text-decoration: none;">&larr; Back to Home</a></p>
     </div>
 
+    <script src="/static/js/navbar.js" type="module"></script>
     <script type="module">
         import { getCookie, authenticatedFetch, handleFetchError } from '/static/js/utils.js';
 
@@ -49,16 +45,19 @@
             if (!resp.ok) return await handleFetchError(resp, 'load servers');
             const servers = await resp.json();
             const list = document.getElementById('serversList');
-            list.innerHTML = '<h3 style="text-align: left; margin-top: 30px;">Active Trusted Servers</h3>';
+            list.innerHTML = '<h3 style="margin-top: 40px; text-align: center;">Active Trusted Servers</h3>';
+            const ul = document.createElement('ul');
+            ul.className = 'server-list';
             servers.forEach(s => {
-                const div = document.createElement('div');
-                div.className = 'server-item';
-                div.innerHTML = `
+                const li = document.createElement('li');
+                li.className = 'server-item';
+                li.innerHTML = `
                     <span>${s.name}</span>
-                    <button class="delete-btn" onclick="deleteServer(${s.id})">Revoke Access</button>
+                    <button class="btn btn-danger" onclick="deleteServer(${s.id})">Revoke Access</button>
                 `;
-                list.appendChild(div);
+                ul.appendChild(li);
             });
+            list.appendChild(ul);
         }
 
         async function addTrustedServer() {
