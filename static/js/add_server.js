@@ -1,7 +1,10 @@
+import { authenticatedFetch, handleFetchError } from '/static/js/utils.js';
+
 let servers = [];
 
 async function fetchServers() {
     const response = await fetch('/api/servers');
+    if (!response.ok) return await handleFetchError(response, 'fetch servers');
     servers = await response.json();
     const list = document.getElementById('server-list');
     list.innerHTML = '';
@@ -48,12 +51,6 @@ function cancelEdit() {
     document.getElementById('cancel-edit').style.display = 'none';
 }
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
 async function handleFormSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('server-id').value;
@@ -63,11 +60,10 @@ async function handleFormSubmit(e) {
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/servers/${id}` : '/api/servers';
 
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(url, {
         method: method,
         headers: { 
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': getCookie('csrf_token')
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({ name, address })
     });
@@ -76,23 +72,22 @@ async function handleFormSubmit(e) {
         cancelEdit();
         fetchServers();
     } else {
-        alert(`Failed to ${id ? 'update' : 'add'} server`);
+        await handleFetchError(response, id ? 'update server' : 'add server');
     }
 }
 
 async function deleteServer(id) {
     if (!confirm('Are you sure?')) return;
-    const response = await fetch(`/api/servers/${id}`, { 
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-Token': getCookie('csrf_token')
-        }
+    const response = await authenticatedFetch(`/api/servers/${id}`, { 
+        method: 'DELETE'
     });
     if (response.ok) {
         if (document.getElementById('server-id').value == id) {
             cancelEdit();
         }
         fetchServers();
+    } else {
+        await handleFetchError(response, 'delete server');
     }
 }
 

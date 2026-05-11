@@ -1,6 +1,4 @@
-/**
- * Filter logic and UI for movie filtering.
- */
+import { parseSize, parseDuration } from './utils.js';
 
 export const FilterOperators = {
     EQUALS: '==',
@@ -17,94 +15,6 @@ export const LogicOperators = {
     AND: 'AND',
     OR: 'OR'
 };
-
-/**
- * Parses a human-readable size string (e.g., "4gb", "10TB", "20mb") into bytes.
- * @param {string|number} size 
- * @returns {number}
- */
-function parseSize(size) {
-    if (typeof size === 'number') return size;
-    if (!size) return 0;
-
-    const units = {
-        'b': 1,
-        'kb': 1024,
-        'mb': 1024 * 1024,
-        'gb': 1024 * 1024 * 1024,
-        'tb': 1024 * 1024 * 1024 * 1024,
-        'pb': 1024 * 1024 * 1024 * 1024 * 1024
-    };
-
-    const match = String(size).toLowerCase().match(/^(\d+(?:\.\d+)?)\s*([a-z]*)$/);
-    if (!match) {
-        const fallback = parseFloat(size);
-        return isNaN(fallback) ? 0 : fallback;
-    }
-
-    const value = parseFloat(match[1]);
-    const unit = match[2];
-
-    if (!unit) return value; // Default to bytes if no unit
-
-    for (const [u, factor] of Object.entries(units)) {
-        if (u === unit || u + 'i' === unit || u.charAt(0) === unit) {
-            // This is a bit loose, but handles 'k', 'kb', 'kib' etc.
-            // Actually let's be more precise
-        }
-    }
-    
-    // Improved unit matching
-    let multiplier = 1;
-    if (unit.startsWith('p')) multiplier = units.pb;
-    else if (unit.startsWith('t')) multiplier = units.tb;
-    else if (unit.startsWith('g')) multiplier = units.gb;
-    else if (unit.startsWith('m')) multiplier = units.mb;
-    else if (unit.startsWith('k')) multiplier = units.kb;
-    
-    return value * multiplier;
-}
-
-/**
- * Parses a human-readable duration string (e.g., "1h 30m", "90m") into milliseconds.
- * @param {string|number} duration 
- * @returns {number}
- */
-function parseDuration(duration) {
-    if (typeof duration === 'number') return duration;
-    if (!duration) return 0;
-
-    const lower = String(duration).toLowerCase();
-    
-    // Check for simple numeric input first
-    const numericValue = parseFloat(lower);
-    if (!isNaN(numericValue) && !/[a-z]/.test(lower)) {
-        return numericValue;
-    }
-
-    let totalMs = 0;
-    const regex = /(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w|y)/g;
-    let match;
-    let found = false;
-
-    while ((match = regex.exec(lower)) !== null) {
-        found = true;
-        const value = parseFloat(match[1]);
-        const unit = match[2];
-
-        switch (unit) {
-            case 'ms': totalMs += value; break;
-            case 's': totalMs += value * 1000; break;
-            case 'm': totalMs += value * 1000 * 60; break;
-            case 'h': totalMs += value * 1000 * 60 * 60; break;
-            case 'd': totalMs += value * 1000 * 60 * 60 * 24; break;
-            case 'w': totalMs += value * 1000 * 60 * 60 * 24 * 7; break;
-            case 'y': totalMs += value * 1000 * 60 * 60 * 24 * 365; break;
-        }
-    }
-
-    return found ? totalMs : (isNaN(numericValue) ? 0 : numericValue);
-}
 
 /**
  * Represents a single filter condition.

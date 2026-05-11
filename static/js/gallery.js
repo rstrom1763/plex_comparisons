@@ -1,26 +1,4 @@
-/**
- * Formats a size in bytes to a human-readable string (MB or GB).
- * @param {number} bytes 
- * @returns {string}
- */
-export function formatSize(bytes) {
-    if (bytes < 1024 * 1024 * 1024) {
-        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    }
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-}
-
-/**
- * Formats a duration in milliseconds to a human-readable string (Xh Ym).
- * @param {number} ms 
- * @returns {string}
- */
-export function formatDuration(ms) {
-    const durationMinutes = Math.floor(ms / (1000 * 60));
-    const hours = Math.floor(durationMinutes / 60);
-    const mins = durationMinutes % 60;
-    return `${hours}h ${mins}m`;
-}
+import { formatSize, formatDuration, getCookie, authenticatedFetch } from '/static/js/utils.js';
 
 /**
  * Creates a movie card element.
