@@ -12,7 +12,8 @@ export function initNavbar() {
         { name: 'Compare Servers', path: '/compare' },
         { name: 'Duplicates', path: '/duplicates' },
         { name: 'Manage Servers', path: '/add-server' },
-        { name: 'Trusted Servers', path: '/trusted-servers' }
+        { name: 'Trusted Servers', path: '/trusted-servers' },
+        { name: 'Downloads', path: '/downloads' }
     ];
 
     nav.innerHTML = '';

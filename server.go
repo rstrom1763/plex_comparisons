@@ -215,6 +215,10 @@ func RunServer() error {
 		c.HTML(http.StatusOK, "trusted_servers.html", nil)
 	})
 
+	authorized.GET("/downloads", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "downloads.html", nil)
+	})
+
 	authorized.GET("/api/trusted-servers", func(c *gin.Context) {
 		servers, err := localDAO.GetTrustedServers()
 		if err != nil {
@@ -286,6 +290,66 @@ func RunServer() error {
 
 		c.Header("Content-Encoding", "gzip")
 		c.Data(http.StatusOK, "application/json", compressedData)
+	})
+
+	authorized.GET("/api/downloads/movies", func(c *gin.Context) {
+		movies, err := structs.GetMovies(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment; filename=movies.csv")
+
+		var b strings.Builder
+		if len(movies) > 0 {
+			b.WriteString(movies[0].CSVHeaders())
+			for _, m := range movies {
+				b.WriteString(m.ToCSV())
+			}
+		}
+		c.String(http.StatusOK, b.String())
+	})
+
+	authorized.GET("/api/downloads/episodes", func(c *gin.Context) {
+		episodes, err := structs.GetEpisodes(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment; filename=episodes.csv")
+
+		var b strings.Builder
+		if len(episodes) > 0 {
+			b.WriteString(episodes[0].CSVHeaders())
+			for _, e := range episodes {
+				b.WriteString(e.ToCSV())
+			}
+		}
+		c.String(http.StatusOK, b.String())
+	})
+
+	authorized.GET("/api/downloads/songs", func(c *gin.Context) {
+		songs, err := structs.GetSongs(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment; filename=songs.csv")
+
+		var b strings.Builder
+		if len(songs) > 0 {
+			b.WriteString(songs[0].CSVHeaders())
+			for _, s := range songs {
+				b.WriteString(s.ToCSV())
+			}
+		}
+		c.String(http.StatusOK, b.String())
 	})
 
 	authorized.GET("/api/episodes", func(c *gin.Context) {

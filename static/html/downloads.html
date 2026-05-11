@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Downloads - Plex Comparison</title>
+    <link rel="stylesheet" href="/static/css/styles.css?v=1.0.2">
+</head>
+<body>
+    <nav id="main-nav"></nav>
+    
+    <div class="content-block">
+        <h1 style="text-align: center;">Media Downloads</h1>
+        
+        <p>Download the current media database as CSV files. These files contain all metadata including quality scores and technical details.</p>
+            
+            <div class="server-list">
+                <div class="server-item">
+                    <div class="server-info">
+                        <strong>Movies CSV</strong>
+                        <div class="server-url">Complete list of movies with quality scores</div>
+                    </div>
+                    <div class="server-actions">
+                        <a href="/api/downloads/movies" class="btn btn-primary">Download Movies</a>
+                    </div>
+                </div>
+
+                <div class="server-item">
+                    <div class="server-info">
+                        <strong>Episodes CSV</strong>
+                        <div class="server-url">Complete list of TV episodes with quality scores</div>
+                    </div>
+                    <div class="server-actions">
+                        <a href="/api/downloads/episodes" class="btn btn-primary">Download Episodes</a>
+                    </div>
+                </div>
+
+                <div class="server-item">
+                    <div class="server-info">
+                        <strong>Songs CSV</strong>
+                        <div class="server-url">Complete list of music tracks</div>
+                    </div>
+                    <div class="server-actions">
+                        <a href="/api/downloads/songs" class="btn btn-primary">Download Songs</a>
+                    </div>
+                </div>
+            </div>
+    </div>
+
+    <script type="module" src="/static/js/navbar.js"></script>
+</body>
+</html>
