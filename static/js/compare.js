@@ -80,6 +80,12 @@ function handleFilterChange(rootGroup, sortConfig) {
     sortAndRender(sortConfig);
 }
 
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
 async function startComparison() {
     const selector = document.getElementById('server-selector');
     const id = selector.value;

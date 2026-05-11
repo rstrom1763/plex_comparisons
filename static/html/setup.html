@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - Plex Comparison</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .setup-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            background: #222;
+            border-radius: 8px;
+            color: white;
+        }
+        .setup-container input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: 1px solid #444;
+            color: white;
+            box-sizing: border-box;
+        }
+        .setup-container button {
+            width: 100%;
+            padding: 10px;
+            background: #e5a00d;
+            border: none;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <h2>Initial Setup</h2>
+        <p>Create an administrator account.</p>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="setup()">Create Account</button>
+        <p id="message"></p>
+    </div>
+    <script>
+        async function setup() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resp = await fetch('/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                alert('Setup complete. Please login.');
+                window.location.href = '/login';
+            } else {
+                document.getElementById('message').innerText = data.error;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -10,7 +10,9 @@
     <nav>
         <a href="/compare">Compare Servers</a>
         <a href="/duplicates">Duplicates</a>
-        <a href="/add-server">Manage Servers →</a>
+        <a href="/add-server">Manage Servers</a>
+        <a href="/trusted-servers">Trusted Servers</a>
+        <a href="#" onclick="logout(); return false;" style="margin-left: 10px;">Logout</a>
     </nav>
     <h1>Movie Gallery</h1>
     <div class="main-container">
@@ -31,5 +33,11 @@
     </div>
 
     <script src="/static/js/gallery.js" type="module"></script>
+    <script>
+        async function logout() {
+            await fetch('/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+    </script>
 </body>
 </html>

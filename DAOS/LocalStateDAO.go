@@ -29,6 +29,16 @@ func NewLocalStateDAO(dbPath string) (*LocalStateDAO, error) {
 		return nil, fmt.Errorf("could not create saved filters table: %w", err)
 	}
 
+	if _, err := db.Exec(constants.CREATE_TRUSTED_SERVERS_TABLE); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("could not create trusted servers table: %w", err)
+	}
+
+	if _, err := db.Exec(constants.CREATE_USERS_TABLE); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("could not create users table: %w", err)
+	}
+
 	return &LocalStateDAO{db: db}, nil
 }
 
@@ -122,4 +132,81 @@ func (dao *LocalStateDAO) UpdateSavedFilter(filter structs.SavedFilter) error {
 		return fmt.Errorf("could not update saved filter: %w", err)
 	}
 	return nil
+}
+
+func (dao *LocalStateDAO) AddTrustedServer(name string, tokenHash string) error {
+	_, err := dao.db.Exec(constants.INSERT_TRUSTED_SERVER, name, tokenHash)
+	if err != nil {
+		return fmt.Errorf("could not add trusted server: %w", err)
+	}
+	return nil
+}
+
+func (dao *LocalStateDAO) GetTrustedServers() ([]structs.TrustedServer, error) {
+	rows, err := dao.db.Query(constants.SELECT_ALL_TRUSTED_SERVERS)
+	if err != nil {
+		return nil, fmt.Errorf("could not query trusted servers: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var servers []structs.TrustedServer
+	for rows.Next() {
+		var s structs.TrustedServer
+		if err := rows.Scan(&s.ID, &s.Name, &s.TokenHash); err != nil {
+			return nil, fmt.Errorf("could not scan trusted server: %w", err)
+		}
+		servers = append(servers, s)
+	}
+	return servers, nil
+}
+
+func (dao *LocalStateDAO) GetTrustedServerByName(name string) (*structs.TrustedServer, error) {
+	var s structs.TrustedServer
+	err := dao.db.QueryRow(constants.SELECT_TRUSTED_SERVER_BY_NAME, name).Scan(&s.ID, &s.Name, &s.TokenHash)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get trusted server by name: %w", err)
+	}
+	return &s, nil
+}
+
+func (dao *LocalStateDAO) DeleteTrustedServer(id int) error {
+	_, err := dao.db.Exec(constants.DELETE_TRUSTED_SERVER, id)
+	if err != nil {
+		return fmt.Errorf("could not delete trusted server: %w", err)
+	}
+	return nil
+}
+
+func (dao *LocalStateDAO) AddUser(username string, passwordHash string) error {
+	_, err := dao.db.Exec(constants.INSERT_USER, username, passwordHash)
+	if err != nil {
+		return fmt.Errorf("could not add user: %w", err)
+	}
+	return nil
+}
+
+func (dao *LocalStateDAO) GetUserByUsername(username string) (*structs.User, error) {
+	var u structs.User
+	err := dao.db.QueryRow(constants.SELECT_USER_BY_USERNAME, username).Scan(&u.ID, &u.Username, &u.PasswordHash)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get user by username: %w", err)
+	}
+	return &u, nil
+}
+
+func (dao *LocalStateDAO) GetUserCount() (int, error) {
+	var count int
+	err := dao.db.QueryRow(constants.COUNT_USERS).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("could not get user count: %w", err)
+	}
+	return count, nil
 }

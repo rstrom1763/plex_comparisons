@@ -213,7 +213,7 @@ async function loadGallery() {
     if (!gallery) return;
 
     try {
-        const response = await fetch('/dump/movies');
+        const response = await fetch('/api/movies');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

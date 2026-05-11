@@ -11,14 +11,75 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	utils "github.com/rstrom1763/goUtils"
 	"github.com/rstrom1763/plex_comparisons/DAOS"
+	"github.com/rstrom1763/plex_comparisons/auth"
 	"github.com/rstrom1763/plex_comparisons/constants"
 	"github.com/rstrom1763/plex_comparisons/structs"
 )
+
+func AuthMiddleware(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		protocol := os.Getenv("PROTOCOL")
+		secure := protocol == "https"
+
+		// 1. Check for shared token in header (Server-to-Server)
+		sharedToken := c.GetHeader("X-Server-Token")
+		if sharedToken != "" {
+			trustedServers, err := localDAO.GetTrustedServers()
+			if err == nil {
+				for _, ts := range trustedServers {
+					if auth.VerifySecret(sharedToken, ts.TokenHash) {
+						c.Next()
+						return
+					}
+				}
+			}
+		}
+
+		// 2. Check for session cookie (UI)
+		sessionToken, err := c.Cookie("session_token")
+		if err == nil {
+			if _, ok := auth.ValidateSession(sessionToken); ok {
+				// CSRF Protection for state-changing methods
+				if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "DELETE" {
+					csrfCookie, _ := c.Cookie("csrf_token")
+					csrfHeader := c.GetHeader("X-CSRF-Token")
+					if csrfCookie == "" || csrfHeader == "" || csrfCookie != csrfHeader {
+						c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch"})
+						return
+					}
+				}
+
+				c.SetSameSite(http.SameSiteLaxMode)
+				c.SetCookie("session_token", sessionToken, 1800, "/", "", secure, true)
+				c.Next()
+				return
+			}
+		}
+
+		// 3. Fallback: If it's an API request, return 401. If it's a UI request, redirect to login.
+		if c.Request.URL.Path == "/login" || c.Request.URL.Path == "/auth/login" {
+			c.Next()
+			return
+		}
+
+		// If API request, return 401
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") || strings.HasPrefix(c.Request.URL.Path, "/video/") {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// Allow public access to static files (you might want to secure these too, but usually /login needs them)
+		// Or just redirect everything else to /login
+		c.Redirect(http.StatusSeeOther, "/login")
+		c.Abort()
+	}
+}
 
 func RunServer() error {
 	// Ensure thumb_cache directory exists
@@ -67,13 +128,138 @@ func RunServer() error {
 	gin.SetMode(gin.ReleaseMode) // Turn off debugging mode
 	r := gin.Default()
 
-	r.GET("/ping", func(c *gin.Context) {
+	// Initial user setup check
+	userCount, _ := localDAO.GetUserCount()
+
+	// Register global static files before auth
+	r.Static("/static", "./static")
+	r.LoadHTMLGlob("static/html/*")
+
+	r.GET("/login", func(c *gin.Context) {
+		if userCount == 0 {
+			c.HTML(http.StatusOK, "setup.html", nil)
+			return
+		}
+		c.HTML(http.StatusOK, "login.html", nil)
+	})
+
+	r.POST("/setup", func(c *gin.Context) {
+		if userCount > 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "setup already completed"})
+			return
+		}
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		hash, _ := auth.HashSecret(req.Password)
+		if err := localDAO.AddUser(req.Username, hash); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		userCount = 1
+		c.JSON(http.StatusOK, gin.H{"message": "user created"})
+	})
+
+	r.POST("/login", func(c *gin.Context) {
+		protocol := os.Getenv("PROTOCOL")
+		secure := protocol == "https"
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		user, err := localDAO.GetUserByUsername(req.Username)
+		if err != nil || user == nil || !auth.VerifySecret(req.Password, user.PasswordHash) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			return
+		}
+
+		token, _ := auth.CreateSession(user.Username)
+		csrfToken, _ := auth.GenerateRandomToken()
+
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie("session_token", token, 1800, "/", "", secure, true)
+		c.SetCookie("csrf_token", csrfToken, 1800, "/", "", secure, false) // Accessible by JS
+		c.JSON(http.StatusOK, gin.H{"message": "logged in"})
+	})
+
+	// Secure routes
+	authorized := r.Group("/")
+	authorized.Use(AuthMiddleware(localDAO))
+
+	authorized.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", nil)
+	})
+
+	authorized.POST("/logout", func(c *gin.Context) {
+		protocol := os.Getenv("PROTOCOL")
+		secure := protocol == "https"
+		token, _ := c.Cookie("session_token")
+		auth.DeleteSession(token)
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie("session_token", "", -1, "/", "", secure, true)
+		c.SetCookie("csrf_token", "", -1, "/", "", secure, false)
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+	})
+
+	authorized.GET("/trusted-servers", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "trusted_servers.html", nil)
+	})
+
+	authorized.GET("/api/trusted-servers", func(c *gin.Context) {
+		servers, err := localDAO.GetTrustedServers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, servers)
+	})
+
+	authorized.POST("/api/trusted-servers", func(c *gin.Context) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		token, _ := auth.GenerateRandomToken()
+		hash, _ := auth.HashSecret(token)
+
+		if err := localDAO.AddTrustedServer(req.Name, hash); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"token": token})
+	})
+
+	authorized.DELETE("/api/trusted-servers/:id", func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		if err := localDAO.DeleteTrustedServer(id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	})
+
+	authorized.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
 
-	r.GET("/dump/movies", func(c *gin.Context) {
+	authorized.GET("/api/movies", func(c *gin.Context) {
 		movies, err := structs.GetMovies(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -102,7 +288,7 @@ func RunServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
-	r.GET("/dump/episodes", func(c *gin.Context) {
+	authorized.GET("/api/episodes", func(c *gin.Context) {
 		episodes, err := structs.GetEpisodes(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -131,7 +317,7 @@ func RunServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
-	r.GET("/dump/songs", func(c *gin.Context) {
+	authorized.GET("/api/songs", func(c *gin.Context) {
 		songs, err := structs.GetSongs(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -160,7 +346,7 @@ func RunServer() error {
 		c.Data(http.StatusOK, "application/json", compressedData)
 	})
 
-	r.GET("/thumb/:hash", func(c *gin.Context) {
+	authorized.GET("/thumb/:hash", func(c *gin.Context) {
 		hash := c.Param("hash")
 
 		if plexDataPath == "" {
@@ -293,26 +479,24 @@ func RunServer() error {
 		c.Data(http.StatusOK, resp.Header.Get("Content-Type"), thumbData)
 	})
 
-	r.Static("/static", "./static")
-
-	r.GET("/movies/gallery", func(c *gin.Context) {
+	authorized.GET("/movies/gallery", func(c *gin.Context) {
 		c.File("./static/html/index.html")
 	})
 
-	r.GET("/compare", func(c *gin.Context) {
+	authorized.GET("/compare", func(c *gin.Context) {
 		c.File("./static/html/compare.html")
 	})
 
-	r.GET("/add-server", func(c *gin.Context) {
+	authorized.GET("/add-server", func(c *gin.Context) {
 		c.File("./static/html/add_server.html")
 	})
 
-	r.GET("/duplicates", func(c *gin.Context) {
+	authorized.GET("/duplicates", func(c *gin.Context) {
 		c.File("./static/html/duplicates.html")
 	})
 
 	// Local State API
-	r.GET("/api/duplicates", func(c *gin.Context) {
+	authorized.GET("/api/duplicates", func(c *gin.Context) {
 		movies, err := structs.GetMovies(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -335,7 +519,7 @@ func RunServer() error {
 		c.JSON(http.StatusOK, result)
 	})
 
-	r.GET("/api/servers", func(c *gin.Context) {
+	authorized.GET("/api/servers", func(c *gin.Context) {
 		servers, err := localDAO.GetServers()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -344,7 +528,7 @@ func RunServer() error {
 		c.JSON(http.StatusOK, servers)
 	})
 
-	r.GET("/api/filters", func(c *gin.Context) {
+	authorized.GET("/api/filters", func(c *gin.Context) {
 		filters, err := localDAO.GetSavedFilters()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -353,7 +537,7 @@ func RunServer() error {
 		c.JSON(http.StatusOK, filters)
 	})
 
-	r.POST("/api/filters", func(c *gin.Context) {
+	authorized.POST("/api/filters", func(c *gin.Context) {
 		var filter structs.SavedFilter
 		if err := c.ShouldBindJSON(&filter); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -367,7 +551,7 @@ func RunServer() error {
 		c.JSON(http.StatusCreated, gin.H{"id": id})
 	})
 
-	r.DELETE("/api/filters/:id", func(c *gin.Context) {
+	authorized.DELETE("/api/filters/:id", func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, _ := strconv.Atoi(idStr)
 		if err := localDAO.DeleteSavedFilter(id); err != nil {
@@ -377,7 +561,7 @@ func RunServer() error {
 		c.Status(http.StatusNoContent)
 	})
 
-	r.PUT("/api/filters/:id", func(c *gin.Context) {
+	authorized.PUT("/api/filters/:id", func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, _ := strconv.Atoi(idStr)
 		var filter structs.SavedFilter
@@ -393,7 +577,7 @@ func RunServer() error {
 		c.Status(http.StatusOK)
 	})
 
-	r.POST("/api/servers", func(c *gin.Context) {
+	authorized.POST("/api/servers", func(c *gin.Context) {
 		var server structs.Server
 		if err := c.ShouldBindJSON(&server); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -406,7 +590,7 @@ func RunServer() error {
 		c.Status(http.StatusCreated)
 	})
 
-	r.DELETE("/api/servers/:id", func(c *gin.Context) {
+	authorized.DELETE("/api/servers/:id", func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, _ := strconv.Atoi(idStr)
 		if err := localDAO.DeleteServer(id); err != nil {
@@ -463,7 +647,7 @@ func RunServer() error {
 		c.JSON(http.StatusOK, gin.H{"message": "file deleted successfully"})
 	})
 
-	r.PUT("/api/servers/:id", func(c *gin.Context) {
+	authorized.PUT("/api/servers/:id", func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, _ := strconv.Atoi(idStr)
 		var server structs.Server
@@ -505,12 +689,23 @@ func RunServer() error {
 			return
 		}
 
+		req, err := http.NewRequest("GET", target.Address+"/api/movies", nil)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create request: " + err.Error()})
+			return
+		}
+
+		// Set auth headers if token is present
+		if target.Token != "" {
+			req.Header.Set("X-Server-Token", target.Token)
+		}
+
 		// Disable TLS verification for remote servers
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		client := &http.Client{Transport: tr}
-		resp, err := client.Get(target.Address + "/dump/movies")
+		resp, err := client.Do(req)
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
 			return
@@ -518,6 +713,11 @@ func RunServer() error {
 		defer func() {
 			_ = resp.Body.Close()
 		}()
+
+		if resp.StatusCode == http.StatusUnauthorized {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "remote server rejected authentication. Ensure tokens match."})
+			return
+		}
 
 		var remoteMovies []*structs.Movie
 		if err := json.NewDecoder(resp.Body).Decode(&remoteMovies); err != nil {

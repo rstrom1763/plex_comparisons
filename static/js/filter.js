@@ -297,6 +297,12 @@ export class FilterPanel {
         window.history.pushState(null, '', newRelativePathQuery);
     }
 
+    static getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
     init() {
         this.render();
     }
@@ -503,7 +509,10 @@ export class FilterPanel {
         try {
             const resp = await fetch('/api/filters', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': FilterPanel.getCookie('csrf_token')
+                },
                 body: JSON.stringify({ name, filter_data: filterData })
             });
             if (resp.ok) {
@@ -597,7 +606,10 @@ export class FilterPanel {
 
             const updateResp = await fetch(`/api/filters/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': FilterPanel.getCookie('csrf_token')
+                },
                 body: JSON.stringify({
                     name: newName.trim(),
                     filter_data: filter.filter_data
@@ -666,7 +678,12 @@ export class FilterPanel {
     async deleteSavedFilter(id) {
         if (!confirm('Are you sure you want to delete this saved filter?')) return;
         try {
-            const resp = await fetch(`/api/filters/${id}`, { method: 'DELETE' });
+            const resp = await fetch(`/api/filters/${id}`, { 
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-Token': FilterPanel.getCookie('csrf_token')
+                }
+            });
             if (resp.ok) {
                 if (this.activeSavedFilterId === id) {
                     this.activeSavedFilterId = null;
@@ -689,7 +706,10 @@ export class FilterPanel {
         try {
             const resp = await fetch(`/api/filters/${this.activeSavedFilterId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': FilterPanel.getCookie('csrf_token')
+                },
                 body: JSON.stringify({ 
                     name: this.activeSavedFilterName, 
                     filter_data: filterData 

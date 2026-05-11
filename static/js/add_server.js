@@ -48,6 +48,12 @@ function cancelEdit() {
     document.getElementById('cancel-edit').style.display = 'none';
 }
 
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
 async function handleFormSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('server-id').value;
@@ -59,7 +65,10 @@ async function handleFormSubmit(e) {
 
     const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': getCookie('csrf_token')
+        },
         body: JSON.stringify({ name, address })
     });
 
@@ -73,7 +82,12 @@ async function handleFormSubmit(e) {
 
 async function deleteServer(id) {
     if (!confirm('Are you sure?')) return;
-    const response = await fetch(`/api/servers/${id}`, { method: 'DELETE' });
+    const response = await fetch(`/api/servers/${id}`, { 
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-Token': getCookie('csrf_token')
+        }
+    });
     if (response.ok) {
         if (document.getElementById('server-id').value == id) {
             cancelEdit();

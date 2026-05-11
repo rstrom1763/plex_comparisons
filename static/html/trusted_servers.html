@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trusted Servers - Plex Comparison</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .container { max-width: 800px; margin: 20px auto; color: var(--text-color); }
+        .server-item { background: var(--card-bg); padding: 15px; margin: 10px 0; border-radius: var(--border-radius); display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .token-display { background: #000; padding: 10px; font-family: monospace; border: 1px solid var(--primary-light); flex-grow: 1; word-break: break-all; margin-right: 10px; border-radius: 4px; color: var(--accent-color); }
+        .token-container { display: flex; align-items: center; margin-top: 10px; }
+        .copy-btn { background: var(--primary-color); color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: var(--transition); }
+        .copy-btn:hover { background: var(--primary-light); }
+        .delete-btn { background: #8b2626; color: white; margin-left: 10px; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: var(--transition); }
+        .delete-btn:hover { background: #b33a3a; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .input-group input { flex-grow: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trusted Servers</h1>
+        <p>Configure tokens for remote servers to authenticate with this server.</p>
+        
+        <div class="input-group">
+            <input type="text" id="newServerName" placeholder="Server Name (e.g. MyRemoteServer)">
+            <button class="btn btn-primary" onclick="addTrustedServer()">Generate Token</button>
+        </div>
+
+        <div id="tokenResult" style="display:none; margin-bottom: 20px; padding: 15px; background: var(--card-bg); border: 1px solid var(--primary-light); border-radius: var(--border-radius); box-shadow: var(--shadow);">
+            <p style="margin-top: 0; color: var(--accent-color);"><strong>Token Generated!</strong> Copy this now, it will not be shown again:</p>
+            <div class="token-container">
+                <div class="token-display" id="generatedToken"></div>
+                <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">Copy</button>
+            </div>
+        </div>
+
+        <div id="serversList"></div>
+        
+        <p><a href="/" style="color: var(--accent-color); text-decoration: none;">&larr; Back to Home</a></p>
+    </div>
+
+    <script>
+        async function loadTrustedServers() {
+            const resp = await fetch('/api/trusted-servers');
+            const servers = await resp.json();
+            const list = document.getElementById('serversList');
+            list.innerHTML = '<h3 style="text-align: left; margin-top: 30px;">Active Trusted Servers</h3>';
+            servers.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'server-item';
+                div.innerHTML = `
+                    <span>${s.name}</span>
+                    <button class="delete-btn" onclick="deleteServer(${s.id})">Revoke Access</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        async function addTrustedServer() {
+            const name = document.getElementById('newServerName').value;
+            if (!name) return alert('Enter a name');
+            
+            const resp = await fetch('/api/trusted-servers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                document.getElementById('generatedToken').innerText = data.token;
+                document.getElementById('tokenResult').style.display = 'block';
+                document.getElementById('newServerName').value = '';
+                document.getElementById('copyBtn').innerText = 'Copy';
+                loadTrustedServers();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        async function copyToClipboard() {
+            const token = document.getElementById('generatedToken').innerText;
+            try {
+                await navigator.clipboard.writeText(token);
+                const btn = document.getElementById('copyBtn');
+                btn.innerText = 'Copied!';
+                setTimeout(() => {
+                    btn.innerText = 'Copy';
+                }, 2000);
+            } catch (err) {
+                alert('Failed to copy: ' + err);
+            }
+        }
+
+        async function deleteServer(id) {
+            if (!confirm('Are you sure you want to revoke access?')) return;
+            await fetch(`/api/trusted-servers/${id}`, { method: 'DELETE' });
+            loadTrustedServers();
+        }
+
+        loadTrustedServers();
+    </script>
+</body>
+</html>

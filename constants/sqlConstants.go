@@ -129,10 +129,33 @@ CREATE TABLE IF NOT EXISTS servers (
     token TEXT
 );`
 
+const CREATE_TRUSTED_SERVERS_TABLE string = `
+CREATE TABLE IF NOT EXISTS trusted_servers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL
+);`
+
+const CREATE_USERS_TABLE string = `
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL
+);`
+
 const INSERT_SERVER string = `INSERT INTO servers (name, address, token) VALUES (?, ?, ?);`
 const SELECT_ALL_SERVERS string = `SELECT id, name, address, token FROM servers;`
 const DELETE_SERVER string = `DELETE FROM servers WHERE id = ?;`
 const UPDATE_SERVER string = `UPDATE servers SET name = ?, address = ?, token = ? WHERE id = ?;`
+
+const INSERT_TRUSTED_SERVER string = `INSERT INTO trusted_servers (name, token_hash) VALUES (?, ?);`
+const SELECT_ALL_TRUSTED_SERVERS string = `SELECT id, name, token_hash FROM trusted_servers;`
+const SELECT_TRUSTED_SERVER_BY_NAME string = `SELECT id, name, token_hash FROM trusted_servers WHERE name = ?;`
+const DELETE_TRUSTED_SERVER string = `DELETE FROM trusted_servers WHERE id = ?;`
+
+const INSERT_USER string = `INSERT INTO users (username, password_hash) VALUES (?, ?);`
+const SELECT_USER_BY_USERNAME string = `SELECT id, username, password_hash FROM users WHERE username = ?;`
+const COUNT_USERS string = `SELECT COUNT(*) FROM users;`
 
 const CREATE_SAVED_FILTERS_TABLE string = `
 CREATE TABLE IF NOT EXISTS saved_filters (
