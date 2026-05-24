@@ -442,7 +442,7 @@ func RunServer() error {
 		c.File(posterPath)
 	})
 
-	r.GET("/video/:hash", func(c *gin.Context) {
+	authorized.GET("/video/:hash", func(c *gin.Context) {
 		hash := c.Param("hash")
 		if hash == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no hash provided"})
@@ -482,7 +482,7 @@ func RunServer() error {
 		c.File(videoPath)
 	})
 
-	r.GET("/remote-thumb/:id/:hash", func(c *gin.Context) {
+	authorized.GET("/remote-thumb/:id/:hash", func(c *gin.Context) {
 		idStr := c.Param("id")
 		hash := c.Param("hash")
 		id, _ := strconv.Atoi(idStr)
@@ -517,7 +517,17 @@ func RunServer() error {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		client := &http.Client{Transport: tr}
-		resp, err := client.Get(target.Address + "/thumb/" + hash)
+		req, err := http.NewRequest("GET", target.Address+"/thumb/"+hash, nil)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create request: " + err.Error()})
+			return
+		}
+
+		if target.Token != "" {
+			req.Header.Set("X-Server-Token", target.Token)
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
 			return
@@ -668,7 +678,7 @@ func RunServer() error {
 		c.Status(http.StatusNoContent)
 	})
 
-	r.DELETE("/api/file", func(c *gin.Context) {
+	authorized.DELETE("/api/file", func(c *gin.Context) {
 		var req struct {
 			Hash string `json:"hash"`
 			Path string `json:"path"`
@@ -735,7 +745,7 @@ func RunServer() error {
 		c.Status(http.StatusOK)
 	})
 
-	r.GET("/api/compare/:id", func(c *gin.Context) {
+	authorized.GET("/api/compare/:id", func(c *gin.Context) {
 		// Comparison logic will be triggered here
 		// For now, just a placeholder that fetches the other server's dump
 		idStr := c.Param("id")
