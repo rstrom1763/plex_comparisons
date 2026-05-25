@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-
 	args := os.Args
 
 	if len(args) == 1 {
@@ -29,7 +28,7 @@ func main() {
 		}
 		err = dump(plexDbPath)
 		if err != nil {
-			log.Fatalf("there was an error performing the csv dump: " + err.Error())
+			log.Fatalf("there was an error performing the csv dump: %s", err.Error())
 		}
 	case "compare":
 		if len(args) != 5 {
@@ -72,7 +71,11 @@ func main() {
 		fmt.Printf("Bytes: %s\n", byteCountString)
 
 	case "server":
-		RunServer()
+		err := RunServer()
+		if err != nil {
+			log.Fatalf("Could not start server: %s", err)
+			return
+		}
 
 	default:
 		log.Fatalf("Unknown command: %s", arg)
