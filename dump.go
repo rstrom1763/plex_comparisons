@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -15,14 +14,11 @@ func dump(plexDbPath string) error {
 
 	db, err := initDB(plexDbPath)
 	if err != nil {
-		return fmt.Errorf("there was an error initializing the DB connection: " + err.Error())
+		return fmt.Errorf("there was an error initializing the DB connection: %w", err)
 	}
 
 	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal("could not close Plex database: ", err)
-		}
+		_ = db.Close()
 	}(db)
 
 	movies, err := GetMovies(db)
@@ -32,7 +28,7 @@ func dump(plexDbPath string) error {
 
 	err = writeCSV("./movies.csv", movies)
 	if err != nil {
-		return fmt.Errorf("error writing movies dump: " + err.Error())
+		return fmt.Errorf("error writing movies dump: %w", err)
 	}
 
 	songs, err := GetSongs(db)
@@ -42,7 +38,7 @@ func dump(plexDbPath string) error {
 
 	err = writeCSV("./songs.csv", songs)
 	if err != nil {
-		return fmt.Errorf("error writing songs dump: " + err.Error())
+		return fmt.Errorf("error writing songs dump: %w", err)
 	}
 
 	episodes, err := GetEpisodes(db)
@@ -52,7 +48,7 @@ func dump(plexDbPath string) error {
 
 	err = writeCSV("./episodes.csv", episodes)
 	if err != nil {
-		return fmt.Errorf("error writing episodes dump: " + err.Error())
+		return fmt.Errorf("error writing episodes dump: %w", err)
 	}
 
 	return nil
@@ -62,21 +58,8 @@ func dump(plexDbPath string) error {
 func writeCSV[T Media](filename string, data []T) error {
 
 	if len(data) == 0 {
-		log.Printf("skipping %s, input is empty\n", filename)
 		return nil
 	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("could not create file: " + err.Error())
-	}
-
-	defer func(file *os.File) {
-		err = file.Close()
-		if err != nil {
-			log.Println("could not close file handle: " + err.Error())
-		}
-	}(file)
 
 	var lines []string
 
@@ -89,8 +72,7 @@ func writeCSV[T Media](filename string, data []T) error {
 	}
 
 	// Write data to file
-	_, err = file.Write([]byte(strings.Join(lines, "")))
-	if err != nil {
+	if err := os.WriteFile(filename, []byte(strings.Join(lines, "")), 0644); err != nil {
 		return fmt.Errorf("could not write dump files: %v", err)
 	}
 

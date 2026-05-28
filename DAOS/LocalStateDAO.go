@@ -2,6 +2,7 @@ package DAOS
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -13,33 +14,45 @@ type LocalStateDAO struct {
 	db *sql.DB
 }
 
+type localStateTable struct {
+	name string
+	sql  string
+}
+
+var localStateTables = []localStateTable{
+	{name: "servers", sql: constants.CREATE_SERVERS_TABLE},
+	{name: "saved filters", sql: constants.CREATE_SAVED_FILTERS_TABLE},
+	{name: "trusted servers", sql: constants.CREATE_TRUSTED_SERVERS_TABLE},
+	{name: "users", sql: constants.CREATE_USERS_TABLE},
+}
+
 func NewLocalStateDAO(dbPath string) (*LocalStateDAO, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	return newLocalStateDAO(dbPath, "sqlite3")
+}
+
+func newLocalStateDAO(dbPath string, driverName string) (*LocalStateDAO, error) {
+	db, err := sql.Open(driverName, dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not open local state database: %w", err)
 	}
 
-	if _, err := db.Exec(constants.CREATE_SERVERS_TABLE); err != nil {
+	if err := ensureLocalStateTables(db); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("could not create servers table: %w", err)
-	}
-
-	if _, err := db.Exec(constants.CREATE_SAVED_FILTERS_TABLE); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("could not create saved filters table: %w", err)
-	}
-
-	if _, err := db.Exec(constants.CREATE_TRUSTED_SERVERS_TABLE); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("could not create trusted servers table: %w", err)
-	}
-
-	if _, err := db.Exec(constants.CREATE_USERS_TABLE); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("could not create users table: %w", err)
+		return nil, err
 	}
 
 	return &LocalStateDAO{db: db}, nil
+}
+
+func ensureLocalStateTables(db *sql.DB) error {
+	var tableErrors []error
+	for _, table := range localStateTables {
+		if _, err := db.Exec(table.sql); err != nil {
+			tableErrors = append(tableErrors, fmt.Errorf("could not ensure %s table exists: %w", table.name, err))
+		}
+	}
+
+	return errors.Join(tableErrors...)
 }
 
 func (dao *LocalStateDAO) Close() error {

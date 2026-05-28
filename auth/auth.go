@@ -99,14 +99,18 @@ func DeleteSession(token string) {
 func CleanupSessions() {
 	for {
 		time.Sleep(5 * time.Minute)
-		sessionMu.Lock()
-		now := time.Now()
-		for token, session := range sessions {
-			if now.After(session.ExpiresAt) {
-				delete(sessions, token)
-			}
+		cleanupExpiredSessions(time.Now())
+	}
+}
+
+func cleanupExpiredSessions(now time.Time) {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+
+	for token, session := range sessions {
+		if now.After(session.ExpiresAt) {
+			delete(sessions, token)
 		}
-		sessionMu.Unlock()
 	}
 }
 

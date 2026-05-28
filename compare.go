@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	. "github.com/rstrom1763/plex_comparisons/structs"
 )
@@ -69,26 +68,27 @@ func getMediaItemsFromCSV(path1 string, mediaType string) ([]Media, error) {
 	return nil, fmt.Errorf("unknown media type: %s", mediaType)
 }
 
-func compare(dumpFilePath1 string, dumpFilePath2 string, mediaType string) {
+func compare(dumpFilePath1 string, dumpFilePath2 string, mediaType string) error {
 	mediaItems1, err := getMediaItemsFromCSV(dumpFilePath1, mediaType)
 	if err != nil {
-		log.Fatalf("could not get Media items from csv: %s", err.Error())
+		return fmt.Errorf("could not get Media items from csv: %w", err)
 	}
 
 	mediaItems2, err := getMediaItemsFromCSV(dumpFilePath2, mediaType)
 	if err != nil {
-		log.Fatalf("could not get Media items from csv: %s", err.Error())
+		return fmt.Errorf("could not get Media items from csv: %w", err)
 	}
 
 	dump1NoHave, dump2NoHave := compareDumps(mediaItems1, mediaItems2)
 
 	err = writeCSV(addNoHaveToPath(dumpFilePath1), dump1NoHave)
 	if err != nil && err.Error() != "input is empty" {
-		log.Fatal(err)
+		return err
 	}
 	err = writeCSV(addNoHaveToPath(dumpFilePath2), dump2NoHave)
 	if err != nil && err.Error() != "input is empty" {
-		log.Fatal(err)
+		return err
 	}
 
+	return nil
 }

@@ -111,13 +111,10 @@ func RunServer() error {
 
 	plexDB, err := initDB(plexDbPath)
 	if err != nil {
-		return fmt.Errorf("there was an error initializing the DB connection: " + err.Error())
+		return fmt.Errorf("there was an error initializing the DB connection: %w", err)
 	}
 	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal("could not close Plex database: ", err)
-		}
+		_ = db.Close()
 	}(plexDB)
 
 	//Generate TLS keys if they do not already exist
@@ -135,16 +132,93 @@ func RunServer() error {
 	r.Static("/static", "./static")
 	r.LoadHTMLGlob("static/html/*")
 
-	r.GET("/login", func(c *gin.Context) {
-		if userCount == 0 {
+	r.GET("/login", loginPageHandler(&userCount))
+	r.POST("/setup", setupHandler(localDAO, &userCount))
+	r.POST("/login", loginSubmitHandler(localDAO))
+
+	// Secure routes
+	authorized := r.Group("/")
+	authorized.Use(AuthMiddleware(localDAO))
+
+	authorized.GET("/", htmlPageHandler("index.html"))
+
+	authorized.POST("/logout", logoutHandler)
+
+	authorized.GET("/trusted-servers", htmlPageHandler("trusted_servers.html"))
+	authorized.GET("/downloads", htmlPageHandler("downloads.html"))
+
+	authorized.GET("/api/trusted-servers", getTrustedServersHandler(localDAO))
+	authorized.POST("/api/trusted-servers", createTrustedServerHandler(localDAO))
+	authorized.DELETE("/api/trusted-servers/:id", deleteTrustedServerHandler(localDAO))
+
+	authorized.GET("/ping", pingHandler)
+
+	authorized.GET("/api/movies", compressedMoviesHandler(plexDB))
+
+	authorized.GET("/api/downloads/movies", movieDownloadHandler(plexDB))
+	authorized.GET("/api/downloads/episodes", episodeDownloadHandler(plexDB))
+	authorized.GET("/api/downloads/songs", songDownloadHandler(plexDB))
+
+	authorized.GET("/api/episodes", compressedEpisodesHandler(plexDB))
+	authorized.GET("/api/songs", compressedSongsHandler(plexDB))
+
+	authorized.GET("/thumb/:hash", thumbHandler(plexDataPath))
+	authorized.GET("/video/:hash", videoHandler(plexDB))
+
+	authorized.GET("/remote-thumb/:id/:hash", remoteThumbHandler(localDAO))
+
+	authorized.GET("/movies/gallery", filePageHandler("./static/html/index.html"))
+	authorized.GET("/compare", filePageHandler("./static/html/compare.html"))
+	authorized.GET("/add-server", filePageHandler("./static/html/add_server.html"))
+	authorized.GET("/duplicates", filePageHandler("./static/html/duplicates.html"))
+
+	// Local State API
+	authorized.GET("/api/duplicates", duplicatesHandler(plexDB))
+
+	authorized.GET("/api/servers", getServersHandler(localDAO))
+	authorized.POST("/api/servers", createServerHandler(localDAO))
+	authorized.DELETE("/api/servers/:id", deleteServerHandler(localDAO))
+
+	authorized.GET("/api/filters", getFiltersHandler(localDAO))
+	authorized.POST("/api/filters", createFilterHandler(localDAO))
+	authorized.DELETE("/api/filters/:id", deleteFilterHandler(localDAO))
+	authorized.PUT("/api/filters/:id", updateFilterHandler(localDAO))
+
+	authorized.DELETE("/api/file", deleteFileHandler(plexDB))
+	authorized.PUT("/api/servers/:id", updateServerHandler(localDAO))
+	authorized.GET("/api/compare/:id", compareServerHandler(localDAO, plexDB))
+
+	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port
+	if protocol == "http" {                                        //Start running the Gin server
+		err = r.Run(":" + port)
+		if err != nil {
+			fmt.Println(err)
+		}
+	} else if protocol == "https" {
+		err = r.RunTLS(":"+port, "./cert.pem", "./private.key")
+		if err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		return fmt.Errorf("unsupported protocol: %s", protocol)
+	}
+
+	return nil
+}
+
+func loginPageHandler(userCount *int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if *userCount == 0 {
 			c.HTML(http.StatusOK, "setup.html", nil)
 			return
 		}
 		c.HTML(http.StatusOK, "login.html", nil)
-	})
+	}
+}
 
-	r.POST("/setup", func(c *gin.Context) {
-		if userCount > 0 {
+func setupHandler(localDAO *DAOS.LocalStateDAO, userCount *int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if *userCount > 0 {
 			c.JSON(http.StatusForbidden, gin.H{"error": "setup already completed"})
 			return
 		}
@@ -161,11 +235,13 @@ func RunServer() error {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		userCount = 1
+		*userCount = 1
 		c.JSON(http.StatusOK, gin.H{"message": "user created"})
-	})
+	}
+}
 
-	r.POST("/login", func(c *gin.Context) {
+func loginSubmitHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		protocol := os.Getenv("PROTOCOL")
 		secure := protocol == "https"
 		var req struct {
@@ -188,47 +264,47 @@ func RunServer() error {
 
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.SetCookie("session_token", token, 1800, "/", "", secure, true)
-		c.SetCookie("csrf_token", csrfToken, 1800, "/", "", secure, false) // Accessible by JS
+		c.SetCookie("csrf_token", csrfToken, 1800, "/", "", secure, false)
 		c.JSON(http.StatusOK, gin.H{"message": "logged in"})
-	})
+	}
+}
 
-	// Secure routes
-	authorized := r.Group("/")
-	authorized.Use(AuthMiddleware(localDAO))
+func logoutHandler(c *gin.Context) {
+	protocol := os.Getenv("PROTOCOL")
+	secure := protocol == "https"
+	token, _ := c.Cookie("session_token")
+	auth.DeleteSession(token)
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("session_token", "", -1, "/", "", secure, true)
+	c.SetCookie("csrf_token", "", -1, "/", "", secure, false)
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+}
 
-	authorized.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", nil)
-	})
+func htmlPageHandler(templateName string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.HTML(http.StatusOK, templateName, nil)
+	}
+}
 
-	authorized.POST("/logout", func(c *gin.Context) {
-		protocol := os.Getenv("PROTOCOL")
-		secure := protocol == "https"
-		token, _ := c.Cookie("session_token")
-		auth.DeleteSession(token)
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("session_token", "", -1, "/", "", secure, true)
-		c.SetCookie("csrf_token", "", -1, "/", "", secure, false)
-		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
-	})
+func filePageHandler(path string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.File(path)
+	}
+}
 
-	authorized.GET("/trusted-servers", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "trusted_servers.html", nil)
-	})
-
-	authorized.GET("/downloads", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "downloads.html", nil)
-	})
-
-	authorized.GET("/api/trusted-servers", func(c *gin.Context) {
+func getTrustedServersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		servers, err := localDAO.GetTrustedServers()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, servers)
-	})
+	}
+}
 
-	authorized.POST("/api/trusted-servers", func(c *gin.Context) {
+func createTrustedServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		var req struct {
 			Name string `json:"name"`
 		}
@@ -246,53 +322,101 @@ func RunServer() error {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"token": token})
-	})
+	}
+}
 
-	authorized.DELETE("/api/trusted-servers/:id", func(c *gin.Context) {
+func deleteTrustedServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		id, _ := strconv.Atoi(c.Param("id"))
 		if err := localDAO.DeleteTrustedServer(id); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
-	})
+	}
+}
 
-	authorized.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
+func pingHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "pong"})
+}
 
-	authorized.GET("/api/movies", func(c *gin.Context) {
+func compressedMoviesHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		movies, err := structs.GetMovies(plexDB)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		jsonData, err := json.Marshal(movies)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not marshal movies: " + err.Error(),
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not marshal movies: " + err.Error()})
 			return
 		}
 
 		compressedData := utils.GzipData(jsonData)
 		if compressedData == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not gzip movies data",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not gzip movies data"})
 			return
 		}
 
 		c.Header("Content-Encoding", "gzip")
 		c.Data(http.StatusOK, "application/json", compressedData)
-	})
+	}
+}
 
-	authorized.GET("/api/downloads/movies", func(c *gin.Context) {
+func compressedEpisodesHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		episodes, err := structs.GetEpisodes(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		jsonData, err := json.Marshal(episodes)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not marshal episodes: " + err.Error()})
+			return
+		}
+
+		compressedData := utils.GzipData(jsonData)
+		if compressedData == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not gzip episodes data"})
+			return
+		}
+
+		c.Header("Content-Encoding", "gzip")
+		c.Data(http.StatusOK, "application/json", compressedData)
+	}
+}
+
+func compressedSongsHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		songs, err := structs.GetSongs(plexDB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		jsonData, err := json.Marshal(songs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not marshal songs: " + err.Error()})
+			return
+		}
+
+		compressedData := utils.GzipData(jsonData)
+		if compressedData == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not gzip songs data"})
+			return
+		}
+
+		c.Header("Content-Encoding", "gzip")
+		c.Data(http.StatusOK, "application/json", compressedData)
+	}
+}
+
+func movieDownloadHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		movies, err := structs.GetMovies(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -310,9 +434,11 @@ func RunServer() error {
 			}
 		}
 		c.String(http.StatusOK, b.String())
-	})
+	}
+}
 
-	authorized.GET("/api/downloads/episodes", func(c *gin.Context) {
+func episodeDownloadHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		episodes, err := structs.GetEpisodes(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -330,9 +456,11 @@ func RunServer() error {
 			}
 		}
 		c.String(http.StatusOK, b.String())
-	})
+	}
+}
 
-	authorized.GET("/api/downloads/songs", func(c *gin.Context) {
+func songDownloadHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		songs, err := structs.GetSongs(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -350,87 +478,25 @@ func RunServer() error {
 			}
 		}
 		c.String(http.StatusOK, b.String())
-	})
+	}
+}
 
-	authorized.GET("/api/episodes", func(c *gin.Context) {
-		episodes, err := structs.GetEpisodes(plexDB)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		jsonData, err := json.Marshal(episodes)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not marshal episodes: " + err.Error(),
-			})
-			return
-		}
-
-		compressedData := utils.GzipData(jsonData)
-		if compressedData == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not gzip episodes data",
-			})
-			return
-		}
-
-		c.Header("Content-Encoding", "gzip")
-		c.Data(http.StatusOK, "application/json", compressedData)
-	})
-
-	authorized.GET("/api/songs", func(c *gin.Context) {
-		songs, err := structs.GetSongs(plexDB)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		jsonData, err := json.Marshal(songs)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not marshal songs: " + err.Error(),
-			})
-			return
-		}
-
-		compressedData := utils.GzipData(jsonData)
-		if compressedData == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "could not gzip songs data",
-			})
-			return
-		}
-
-		c.Header("Content-Encoding", "gzip")
-		c.Data(http.StatusOK, "application/json", compressedData)
-	})
-
-	authorized.GET("/thumb/:hash", func(c *gin.Context) {
+func thumbHandler(plexDataPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		hash := c.Param("hash")
 
 		if plexDataPath == "" {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "PLEX_DATA_PATH not set in environment",
-			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "PLEX_DATA_PATH not set in environment"})
 			return
 		}
 
 		if hash == "" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "no metadata hash provided",
-			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no metadata hash provided"})
 			return
 		}
 
-		posterDir := plexMoviePosterDir(plexDataPath, hash)
-		posterPath, err := findPosterFile(posterDir)
+		posterPath, err := findPosterFile(plexMoviePosterDir(plexDataPath, hash))
 		if err != nil {
-			// Serve a placeholder SVG for missing thumbnails
 			placeholder := `<svg width="200" height="300" xmlns="http://www.w3.org/2000/svg">
 				<rect width="100%" height="100%" fill="#333"/>
 				<text x="50%" y="50%" font-family="Arial" font-size="16" fill="#fff" text-anchor="middle" dy=".3em">No Poster</text>
@@ -440,9 +506,11 @@ func RunServer() error {
 		}
 
 		c.File(posterPath)
-	})
+	}
+}
 
-	authorized.GET("/video/:hash", func(c *gin.Context) {
+func videoHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		hash := c.Param("hash")
 		if hash == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no hash provided"})
@@ -470,22 +538,19 @@ func RunServer() error {
 
 		videoPath := targetMovie.File
 		if _, err := os.Stat(videoPath); os.IsNotExist(err) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "video file not found on disk",
-				"path":  videoPath,
-			})
+			c.JSON(http.StatusNotFound, gin.H{"error": "video file not found on disk", "path": videoPath})
 			return
 		}
 
-		// Ensure we support range requests for streaming
 		c.Header("Accept-Ranges", "bytes")
 		c.File(videoPath)
-	})
+	}
+}
 
-	authorized.GET("/remote-thumb/:id/:hash", func(c *gin.Context) {
-		idStr := c.Param("id")
+func remoteThumbHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
 		hash := c.Param("hash")
-		id, _ := strconv.Atoi(idStr)
 
 		if hash == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no hash provided"})
@@ -498,7 +563,6 @@ func RunServer() error {
 			return
 		}
 
-		// Not in cache, fetch from remote
 		servers, _ := localDAO.GetServers()
 		var target structs.Server
 		for _, s := range servers {
@@ -513,10 +577,6 @@ func RunServer() error {
 			return
 		}
 
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
 		req, err := http.NewRequest("GET", target.Address+"/thumb/"+hash, nil)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create request: " + err.Error()})
@@ -527,6 +587,8 @@ func RunServer() error {
 			req.Header.Set("X-Server-Token", target.Token)
 		}
 
+		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		client := &http.Client{Transport: tr}
 		resp, err := client.Do(req)
 		if err != nil {
 			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
@@ -547,30 +609,13 @@ func RunServer() error {
 			return
 		}
 
-		// Save to cache
 		_ = os.WriteFile(cachePath, thumbData, 0644)
-
 		c.Data(http.StatusOK, resp.Header.Get("Content-Type"), thumbData)
-	})
+	}
+}
 
-	authorized.GET("/movies/gallery", func(c *gin.Context) {
-		c.File("./static/html/index.html")
-	})
-
-	authorized.GET("/compare", func(c *gin.Context) {
-		c.File("./static/html/compare.html")
-	})
-
-	authorized.GET("/add-server", func(c *gin.Context) {
-		c.File("./static/html/add_server.html")
-	})
-
-	authorized.GET("/duplicates", func(c *gin.Context) {
-		c.File("./static/html/duplicates.html")
-	})
-
-	// Local State API
-	authorized.GET("/api/duplicates", func(c *gin.Context) {
+func duplicatesHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		movies, err := structs.GetMovies(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -591,67 +636,22 @@ func RunServer() error {
 		}
 
 		c.JSON(http.StatusOK, result)
-	})
+	}
+}
 
-	authorized.GET("/api/servers", func(c *gin.Context) {
+func getServersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		servers, err := localDAO.GetServers()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, servers)
-	})
+	}
+}
 
-	authorized.GET("/api/filters", func(c *gin.Context) {
-		filters, err := localDAO.GetSavedFilters()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, filters)
-	})
-
-	authorized.POST("/api/filters", func(c *gin.Context) {
-		var filter structs.SavedFilter
-		if err := c.ShouldBindJSON(&filter); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		id, err := localDAO.AddSavedFilter(filter)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusCreated, gin.H{"id": id})
-	})
-
-	authorized.DELETE("/api/filters/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, _ := strconv.Atoi(idStr)
-		if err := localDAO.DeleteSavedFilter(id); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.Status(http.StatusNoContent)
-	})
-
-	authorized.PUT("/api/filters/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, _ := strconv.Atoi(idStr)
-		var filter structs.SavedFilter
-		if err := c.ShouldBindJSON(&filter); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		filter.ID = id
-		if err := localDAO.UpdateSavedFilter(filter); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.Status(http.StatusOK)
-	})
-
-	authorized.POST("/api/servers", func(c *gin.Context) {
+func createServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		var server structs.Server
 		if err := c.ShouldBindJSON(&server); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -666,19 +666,98 @@ func RunServer() error {
 			return
 		}
 		c.Status(http.StatusCreated)
-	})
+	}
+}
 
-	authorized.DELETE("/api/servers/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, _ := strconv.Atoi(idStr)
+func updateServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		var server structs.Server
+		if err := c.ShouldBindJSON(&server); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if server.Token == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "shared token is required"})
+			return
+		}
+		server.ID = id
+		if err := localDAO.UpdateServer(server); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}
+
+func deleteServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
 		if err := localDAO.DeleteServer(id); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.Status(http.StatusNoContent)
-	})
+	}
+}
 
-	authorized.DELETE("/api/file", func(c *gin.Context) {
+func getFiltersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		filters, err := localDAO.GetSavedFilters()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, filters)
+	}
+}
+
+func createFilterHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var filter structs.SavedFilter
+		if err := c.ShouldBindJSON(&filter); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		id, err := localDAO.AddSavedFilter(filter)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"id": id})
+	}
+}
+
+func updateFilterHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		var filter structs.SavedFilter
+		if err := c.ShouldBindJSON(&filter); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		filter.ID = id
+		if err := localDAO.UpdateSavedFilter(filter); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}
+
+func deleteFilterHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		if err := localDAO.DeleteSavedFilter(id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+func deleteFileHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		var req struct {
 			Hash string `json:"hash"`
 			Path string `json:"path"`
@@ -693,7 +772,6 @@ func RunServer() error {
 			return
 		}
 
-		// Retrieve path from metadata
 		var filePath string
 		var err error
 		if req.Path != "" {
@@ -711,7 +789,6 @@ func RunServer() error {
 			return
 		}
 
-		// Security check: ensure the file exists before trying to delete
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "file not found on disk"})
 			return
@@ -723,33 +800,12 @@ func RunServer() error {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "file deleted successfully"})
-	})
+	}
+}
 
-	authorized.PUT("/api/servers/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, _ := strconv.Atoi(idStr)
-		var server structs.Server
-		if err := c.ShouldBindJSON(&server); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if server.Token == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "shared token is required"})
-			return
-		}
-		server.ID = id
-		if err := localDAO.UpdateServer(server); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.Status(http.StatusOK)
-	})
-
-	authorized.GET("/api/compare/:id", func(c *gin.Context) {
-		// Comparison logic will be triggered here
-		// For now, just a placeholder that fetches the other server's dump
-		idStr := c.Param("id")
-		id, _ := strconv.Atoi(idStr)
+func compareServerHandler(localDAO *DAOS.LocalStateDAO, plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
 		servers, _ := localDAO.GetServers()
 		var target structs.Server
 		for _, s := range servers {
@@ -764,7 +820,6 @@ func RunServer() error {
 			return
 		}
 
-		// Simplified comparison: just return what we have vs what they have
 		localMovies, err := structs.GetMovies(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -777,15 +832,11 @@ func RunServer() error {
 			return
 		}
 
-		// Set auth headers if token is present
 		if target.Token != "" {
 			req.Header.Set("X-Server-Token", target.Token)
 		}
 
-		// Disable TLS verification for remote servers
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
+		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 		client := &http.Client{Transport: tr}
 		resp, err := client.Do(req)
 		if err != nil {
@@ -808,33 +859,12 @@ func RunServer() error {
 		}
 
 		remoteOnly, localOnly := compareDumps(localMovies, remoteMovies)
-
-		c.JSON(http.StatusOK, gin.H{
-			"local_only":  localOnly,
-			"remote_only": remoteOnly,
-		})
-	})
-
-	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port
-	if protocol == "http" {                                        //Start running the Gin server
-		err = r.Run(":" + port)
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else if protocol == "https" {
-		err = r.RunTLS(":"+port, "./cert.pem", "./private.key")
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		log.Fatal("Something went wrong starting the Gin server")
+		c.JSON(http.StatusOK, gin.H{"local_only": localOnly, "remote_only": remoteOnly})
 	}
-
-	return nil
 }
 
 func plexMoviePosterDir(plexDataDir string, hash string) string {
-	if hash == "" {
+	if len(hash) < 2 {
 		return ""
 	}
 
@@ -864,10 +894,7 @@ func findPosterFile(posterDir string) (string, error) {
 			continue
 		}
 
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
+		info, _ := e.Info()
 
 		if info.Size() > maxSize {
 			maxSize = info.Size()

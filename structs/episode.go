@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -165,9 +164,7 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 		return nil, fmt.Errorf("could not query Episodes: %w", err)
 	}
 	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Printf("error closing DB rows: %s", err)
-		}
+		_ = rows.Close()
 	}()
 
 	var episodes []*Episode
@@ -244,9 +241,7 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 		return nil, fmt.Errorf("could not open csv file")
 	}
 	defer func() {
-		if cerr := f.Close(); cerr != nil {
-			log.Printf("could not close csv file: %v", path)
-		}
+		_ = f.Close()
 	}()
 
 	r := csv.NewReader(f)
@@ -363,10 +358,6 @@ func GetEpisodesFromCSVFile(path string) ([]*Episode, error) {
 			AudienceRating: math.Round(audienceRating*10) / 10,
 			MetadataHash:   trim(rec[21]),
 			QualityScore:   qualityScore,
-		}
-
-		if len(rec) <= 22 {
-			e.CalculateQualityScore()
 		}
 
 		episodes = append(episodes, e)

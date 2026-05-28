@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"strconv"
@@ -169,7 +168,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 
 	rows, err := db.Query(MOVIE_DUMP_QUERY)
 	if err != nil {
-		return nil, fmt.Errorf("could not query Movies: " + err.Error())
+		return nil, fmt.Errorf("could not query Movies: %w", err)
 	}
 
 	var (
@@ -197,16 +196,13 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 	var movies []*Movie
 
 	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			log.Printf("error closing DB rows: %s", err)
-		}
+		_ = rows.Close()
 	}(rows)
 
 	for rows.Next() {
 		err = rows.Scan(&Title, &ContentRating, &Year, &Genre, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Container, &Bitrate, &VideoCodec, &Height, &Width, &Resolution, &AudioCodec, &CriticRating, &AudienceRating, &MetadataHash)
 		if err != nil {
-			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
+			return nil, fmt.Errorf("there was an error scanning the row: %w", err)
 		}
 
 		movie := Movie{
@@ -247,10 +243,7 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 	}
 
 	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Printf("could not close csv file: %v", path)
-		}
+		_ = file.Close()
 	}(file)
 
 	csvReader := csv.NewReader(file)
@@ -358,10 +351,6 @@ func GetMoviesFromCSVFile(path string) ([]*Movie, error) {
 			AudienceRating: math.Round(audienceRating*10) / 10,
 			MetadataHash:   trim(record[19]),
 			QualityScore:   qualityScore,
-		}
-
-		if len(record) <= 20 {
-			movie.CalculateQualityScore()
 		}
 
 		movies = append(movies, movie)

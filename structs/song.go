@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -86,7 +85,7 @@ func (s *Song) CSVHeaders() string {
 func GetSongs(db *sql.DB) ([]*Song, error) {
 	rows, err := db.Query(SONG_DUMP_QUERY)
 	if err != nil {
-		return nil, fmt.Errorf("could not query Songs: " + err.Error())
+		return nil, fmt.Errorf("could not query Songs: %w", err)
 	}
 
 	var (
@@ -108,16 +107,13 @@ func GetSongs(db *sql.DB) ([]*Song, error) {
 	var Songs []*Song
 
 	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			log.Printf("error closing DB rows: %s", err)
-		}
+		_ = rows.Close()
 	}(rows)
 
 	for rows.Next() {
 		err = rows.Scan(&Title, &Year, &Genre, &AlbumTitle, &ArtistName, &Library, &MediaType, &File, &Hash, &Size, &Duration, &Bitrate, &AudioCodec, &MetadataHash)
 		if err != nil {
-			return nil, fmt.Errorf("there was an error scanning the row: " + err.Error())
+			return nil, fmt.Errorf("there was an error scanning the row: %w", err)
 		}
 
 		Song := Song{
@@ -149,9 +145,7 @@ func GetSongsFromCSVFile(path string) ([]*Song, error) {
 		return nil, fmt.Errorf("could not open csv file")
 	}
 	defer func(file *os.File) {
-		if err := file.Close(); err != nil {
-			log.Printf("could not close csv file: %v", path)
-		}
+		_ = file.Close()
 	}(file)
 
 	r := csv.NewReader(file)

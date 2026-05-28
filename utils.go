@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -53,7 +52,7 @@ func getByteSumFromDumpFile(dumpPath string, mediaType string) (int64, error) {
 	var byteSum int64
 
 	if !utils.FileExists(dumpPath) {
-		log.Fatalf("%s does not exist", dumpPath)
+		return 0, fmt.Errorf("%s does not exist", dumpPath)
 	}
 
 	items, err := getMediaItemsFromCSV(dumpPath, mediaType)
