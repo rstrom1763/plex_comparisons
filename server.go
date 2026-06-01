@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/tls"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +23,9 @@ import (
 	"github.com/rstrom1763/plex_comparisons/constants"
 	"github.com/rstrom1763/plex_comparisons/structs"
 )
+
+//go:embed static
+var embeddedStaticFiles embed.FS
 
 func AuthMiddleware(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -128,9 +133,9 @@ func RunServer() error {
 	// Initial user setup check
 	userCount, _ := localDAO.GetUserCount()
 
-	// Register global static files before auth
-	r.Static("/static", "./static")
-	r.LoadHTMLGlob("static/html/*")
+	if err := registerEmbeddedAssets(r); err != nil {
+		return err
+	}
 
 	r.GET("/login", loginPageHandler(&userCount))
 	r.POST("/setup", setupHandler(localDAO, &userCount))
@@ -167,10 +172,10 @@ func RunServer() error {
 
 	authorized.GET("/remote-thumb/:id/:hash", remoteThumbHandler(localDAO))
 
-	authorized.GET("/movies/gallery", filePageHandler("./static/html/index.html"))
-	authorized.GET("/compare", filePageHandler("./static/html/compare.html"))
-	authorized.GET("/add-server", filePageHandler("./static/html/add_server.html"))
-	authorized.GET("/duplicates", filePageHandler("./static/html/duplicates.html"))
+	authorized.GET("/movies/gallery", htmlPageHandler("index.html"))
+	authorized.GET("/compare", htmlPageHandler("compare.html"))
+	authorized.GET("/add-server", htmlPageHandler("add_server.html"))
+	authorized.GET("/duplicates", htmlPageHandler("duplicates.html"))
 
 	// Local State API
 	authorized.GET("/api/duplicates", duplicatesHandler(plexDB))
@@ -206,13 +211,32 @@ func RunServer() error {
 	return nil
 }
 
+func registerEmbeddedAssets(r *gin.Engine) error {
+	staticFiles, err := embeddedStaticFS()
+	if err != nil {
+		return err
+	}
+
+	r.StaticFS("/static", staticFiles)
+	return nil
+}
+
+func embeddedStaticFS() (http.FileSystem, error) {
+	staticFiles, err := fs.Sub(embeddedStaticFiles, "static")
+	if err != nil {
+		return nil, fmt.Errorf("could not load embedded static files: %w", err)
+	}
+
+	return http.FS(staticFiles), nil
+}
+
 func loginPageHandler(userCount *int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if *userCount == 0 {
-			c.HTML(http.StatusOK, "setup.html", nil)
+			serveEmbeddedHTML(c, "setup.html")
 			return
 		}
-		c.HTML(http.StatusOK, "login.html", nil)
+		serveEmbeddedHTML(c, "login.html")
 	}
 }
 
@@ -282,14 +306,23 @@ func logoutHandler(c *gin.Context) {
 
 func htmlPageHandler(templateName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(http.StatusOK, templateName, nil)
+		serveEmbeddedHTML(c, templateName)
 	}
 }
 
-func filePageHandler(path string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.File(path)
+func serveEmbeddedHTML(c *gin.Context, fileName string) {
+	if fileName != filepath.Base(fileName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid HTML file name"})
+		return
 	}
+
+	data, err := embeddedStaticFiles.ReadFile(filepath.ToSlash(filepath.Join("static", "html", fileName)))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "HTML file not found"})
+		return
+	}
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 }
 
 func getTrustedServersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {

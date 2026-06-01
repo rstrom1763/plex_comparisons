@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -299,12 +298,12 @@ func TestLoginSetupAndLogoutHandlers(t *testing.T) {
 	dao := newTestLocalDAO(t)
 	userCount := 0
 
-	rec := serveHTMLServerHandler(http.MethodGet, "/login", "/login", loginPageHandler(&userCount), nil)
+	rec := serveServerHandler(http.MethodGet, "/login", "/login", loginPageHandler(&userCount), nil)
 	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("setup")) {
 		t.Fatalf("setup page response = %d %q", rec.Code, rec.Body.String())
 	}
 	userCount = 1
-	rec = serveHTMLServerHandler(http.MethodGet, "/login", "/login", loginPageHandler(&userCount), nil)
+	rec = serveServerHandler(http.MethodGet, "/login", "/login", loginPageHandler(&userCount), nil)
 	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("login")) {
 		t.Fatalf("login page response = %d %q", rec.Code, rec.Body.String())
 	}
@@ -362,18 +361,37 @@ func TestLoginSetupAndLogoutHandlers(t *testing.T) {
 }
 
 func TestPageHandlers(t *testing.T) {
-	rec := serveHTMLServerHandler(http.MethodGet, "/", "/", htmlPageHandler("login.html"), nil)
+	rec := serveServerHandler(http.MethodGet, "/", "/", htmlPageHandler("login.html"), nil)
 	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("login")) {
 		t.Fatalf("html handler response = %d %q", rec.Code, rec.Body.String())
 	}
 
-	path := filepath.Join(t.TempDir(), "page.html")
-	if err := os.WriteFile(path, []byte("file page"), 0644); err != nil {
-		t.Fatalf("WriteFile(page) error = %v", err)
+	rec = serveServerHandler(http.MethodGet, "/", "/", htmlPageHandler("index.html"), nil)
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "" || !bytes.Contains(rec.Body.Bytes(), []byte("Movie Gallery")) {
+		t.Fatalf("index handler response = %d location=%q body=%q, want embedded index without redirect", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
-	rec = serveServerHandler(http.MethodGet, "/page", "/page", filePageHandler(path), nil)
-	if rec.Code != http.StatusOK || rec.Body.String() != "file page" {
-		t.Fatalf("file handler response = %d %q", rec.Code, rec.Body.String())
+}
+
+func TestRegisterEmbeddedAssetsServesStaticFilesAndHTML(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	if err := registerEmbeddedAssets(router); err != nil {
+		t.Fatalf("registerEmbeddedAssets() error = %v", err)
+	}
+	router.GET("/compare", htmlPageHandler("compare.html"))
+
+	req := httptest.NewRequest(http.MethodGet, "/static/css/styles.css", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("body")) {
+		t.Fatalf("embedded static response = %d %q, want stylesheet", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/compare", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("Compare Servers")) {
+		t.Fatalf("embedded HTML response = %d %q, want compare page", rec.Code, rec.Body.String())
 	}
 }
 
@@ -904,21 +922,6 @@ func serveServerHandlerWithCookies(method string, route string, target string, h
 	for _, cookie := range cookies {
 		req.AddCookie(cookie)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-	return rec
-}
-
-func serveHTMLServerHandler(method string, route string, target string, handler gin.HandlerFunc, body []byte) *httptest.ResponseRecorder {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.SetHTMLTemplate(template.Must(template.New("").Parse(`{{define "setup.html"}}setup{{end}}{{define "login.html"}}login{{end}}`)))
-	router.Handle(method, route, handler)
-
-	req := httptest.NewRequest(method, target, bytes.NewReader(body))
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
