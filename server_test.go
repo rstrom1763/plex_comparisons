@@ -825,6 +825,46 @@ func TestCompareServerHandler(t *testing.T) {
 	}
 }
 
+func TestGetServerMoviesHandler(t *testing.T) {
+	dao := newTestLocalDAO(t)
+
+	rec := serveServerHandler(http.MethodGet, "/api/servers/:id/movies", "/api/servers/1/movies", getServerMoviesHandler(dao), nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing server status = %d, want 404", rec.Code)
+	}
+
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/movies" {
+			t.Fatalf("remote path = %q, want /api/movies", r.URL.Path)
+		}
+		if got := r.Header.Get("X-Server-Token"); got != "token" {
+			t.Fatalf("X-Server-Token = %q, want token", got)
+		}
+		_ = json.NewEncoder(w).Encode([]*structs.Movie{{Title: "Remote Gallery", Year: 2026}})
+	}))
+	t.Cleanup(remote.Close)
+	if err := dao.AddServer(structs.Server{Name: "Remote", Address: remote.URL + "/", Token: "token"}); err != nil {
+		t.Fatalf("AddServer() error = %v", err)
+	}
+
+	rec = serveServerHandler(http.MethodGet, "/api/servers/:id/movies", "/api/servers/1/movies", getServerMoviesHandler(dao), nil)
+	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("Remote Gallery")) {
+		t.Fatalf("remote movies response = %d %q, want remote movie", rec.Code, rec.Body.String())
+	}
+
+	unauthorizedRemote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(unauthorizedRemote.Close)
+	if err := dao.AddServer(structs.Server{Name: "Unauthorized", Address: unauthorizedRemote.URL, Token: "token"}); err != nil {
+		t.Fatalf("AddServer(unauthorized) error = %v", err)
+	}
+	rec = serveServerHandler(http.MethodGet, "/api/servers/:id/movies", "/api/servers/2/movies", getServerMoviesHandler(dao), nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized remote status = %d, want 401", rec.Code)
+	}
+}
+
 func TestRemoteThumbHandler(t *testing.T) {
 	dao := newTestLocalDAO(t)
 	originalDir, err := os.Getwd()
@@ -841,12 +881,12 @@ func TestRemoteThumbHandler(t *testing.T) {
 		}
 	})
 
-	rec := serveHandlerWithParams(remoteThumbHandler(dao), gin.Params{{Key: "id", Value: "1"}, {Key: "hash", Value: ""}})
+	rec := serveHandlerWithParams(remoteThumbHandler(dao, ""), gin.Params{{Key: "id", Value: "1"}, {Key: "hash", Value: ""}})
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("empty hash status = %d, want 400", rec.Code)
 	}
 
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/abcdef", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/abcdef", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing server status = %d, want 404", rec.Code)
 	}
@@ -857,9 +897,22 @@ func TestRemoteThumbHandler(t *testing.T) {
 	if err := os.WriteFile(filepath.Join("thumb_cache", "cached.jpg"), []byte("cached"), 0644); err != nil {
 		t.Fatalf("WriteFile(cache) error = %v", err)
 	}
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/cached", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/cached", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusOK || rec.Body.String() != "cached" {
 		t.Fatalf("cached response = %d %q, want cached", rec.Code, rec.Body.String())
+	}
+
+	plexDataPath := t.TempDir()
+	localPosterDir := plexMoviePosterDir(plexDataPath, "localhash")
+	if err := os.MkdirAll(localPosterDir, 0755); err != nil {
+		t.Fatalf("MkdirAll(localPosterDir) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(localPosterDir, "poster.jpg"), []byte("local-poster"), 0644); err != nil {
+		t.Fatalf("WriteFile(local poster) error = %v", err)
+	}
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/localhash", remoteThumbHandler(dao, plexDataPath), nil)
+	if rec.Code != http.StatusOK || rec.Body.String() != "local-poster" {
+		t.Fatalf("local poster response = %d %q, want local poster", rec.Code, rec.Body.String())
 	}
 
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -874,7 +927,7 @@ func TestRemoteThumbHandler(t *testing.T) {
 		t.Fatalf("AddServer() error = %v", err)
 	}
 
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/remotehash", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/remotehash", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusOK || rec.Body.String() != "remote-thumb" {
 		t.Fatalf("remote response = %d %q, want remote thumb", rec.Code, rec.Body.String())
 	}
@@ -889,7 +942,7 @@ func TestRemoteThumbHandler(t *testing.T) {
 	if err := dao.AddServer(structs.Server{Name: "Failing", Address: failingRemote.URL, Token: "token"}); err != nil {
 		t.Fatalf("AddServer(failing) error = %v", err)
 	}
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/2/failinghash", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/2/failinghash", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("remote failure status = %d, want 401", rec.Code)
 	}
@@ -897,7 +950,7 @@ func TestRemoteThumbHandler(t *testing.T) {
 	if err := dao.AddServer(structs.Server{Name: "Bad URL", Address: "http://[::1", Token: "token"}); err != nil {
 		t.Fatalf("AddServer(bad url) error = %v", err)
 	}
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/3/badurlhash", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/3/badurlhash", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("bad url status = %d, want 500", rec.Code)
 	}
@@ -905,7 +958,7 @@ func TestRemoteThumbHandler(t *testing.T) {
 	if err := dao.AddServer(structs.Server{Name: "Unreachable", Address: "http://127.0.0.1:1", Token: "token"}); err != nil {
 		t.Fatalf("AddServer(unreachable) error = %v", err)
 	}
-	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/4/unreachablehash", remoteThumbHandler(dao), nil)
+	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/4/unreachablehash", remoteThumbHandler(dao, ""), nil)
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("unreachable status = %d, want 502", rec.Code)
 	}

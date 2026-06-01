@@ -180,7 +180,7 @@ func RunServer() error {
 	authorized.GET("/thumb/:hash", thumbHandler(plexDataPath))
 	authorized.GET("/video/:hash", videoHandler(plexDB))
 
-	authorized.GET("/remote-thumb/:id/:hash", remoteThumbHandler(localDAO))
+	authorized.GET("/remote-thumb/:id/:hash", remoteThumbHandler(localDAO, plexDataPath))
 
 	authorized.GET("/movies/gallery", htmlPageHandler("index.html"))
 	authorized.GET("/compare", htmlPageHandler("compare.html"))
@@ -193,6 +193,7 @@ func RunServer() error {
 	authorized.GET("/api/servers", getServersHandler(localDAO))
 	authorized.POST("/api/servers", createServerHandler(localDAO))
 	authorized.DELETE("/api/servers/:id", deleteServerHandler(localDAO))
+	authorized.GET("/api/servers/:id/movies", getServerMoviesHandler(localDAO))
 
 	authorized.GET("/api/filters", getFiltersHandler(localDAO))
 	authorized.POST("/api/filters", createFilterHandler(localDAO))
@@ -594,7 +595,7 @@ func videoHandler(plexDB *sql.DB) gin.HandlerFunc {
 	}
 }
 
-func remoteThumbHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+func remoteThumbHandler(localDAO *DAOS.LocalStateDAO, plexDataPath string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, _ := strconv.Atoi(c.Param("id"))
 		hash := c.Param("hash")
@@ -607,6 +608,11 @@ func remoteThumbHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 		cachePath := filepath.Join("thumb_cache", hash+".jpg")
 		if _, err := os.Stat(cachePath); err == nil {
 			c.File(cachePath)
+			return
+		}
+
+		if localPosterPath, err := findPosterFile(plexMoviePosterDir(plexDataPath, hash)); err == nil {
+			c.File(localPosterPath)
 			return
 		}
 
@@ -748,6 +754,42 @@ func deleteServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 	}
 }
 
+func getServerMoviesHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		servers, err := localDAO.GetServers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var target structs.Server
+		for _, server := range servers {
+			if server.ID == id {
+				target = server
+				break
+			}
+		}
+
+		if target.Address == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+			return
+		}
+
+		movies, err := fetchRemoteMovies(target)
+		if err != nil {
+			status := http.StatusBadGateway
+			if remoteErr, ok := err.(*remoteServerError); ok {
+				status = remoteErr.status
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, movies)
+	}
+}
+
 func getFiltersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		filters, err := localDAO.GetSavedFilters()
@@ -873,41 +915,63 @@ func compareServerHandler(localDAO *DAOS.LocalStateDAO, plexDB *sql.DB) gin.Hand
 			return
 		}
 
-		req, err := http.NewRequest("GET", target.Address+"/api/movies", nil)
+		remoteMovies, err := fetchRemoteMovies(target)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create request: " + err.Error()})
-			return
-		}
-
-		if target.Token != "" {
-			req.Header.Set("X-Server-Token", target.Token)
-		}
-
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client := &http.Client{Transport: tr}
-		resp, err := client.Do(req)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": "could not reach remote server: " + err.Error()})
-			return
-		}
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		if resp.StatusCode == http.StatusUnauthorized {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "remote server rejected authentication. Ensure tokens match."})
-			return
-		}
-
-		var remoteMovies []*structs.Movie
-		if err := json.NewDecoder(resp.Body).Decode(&remoteMovies); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode remote dump: " + err.Error()})
+			status := http.StatusBadGateway
+			if remoteErr, ok := err.(*remoteServerError); ok {
+				status = remoteErr.status
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
 			return
 		}
 
 		remoteOnly, localOnly := compareDumps(localMovies, remoteMovies)
 		c.JSON(http.StatusOK, gin.H{"local_only": localOnly, "remote_only": remoteOnly})
 	}
+}
+
+type remoteServerError struct {
+	status  int
+	message string
+}
+
+func (e *remoteServerError) Error() string {
+	return e.message
+}
+
+func fetchRemoteMovies(target structs.Server) ([]*structs.Movie, error) {
+	req, err := http.NewRequest("GET", strings.TrimRight(target.Address, "/")+"/api/movies", nil)
+	if err != nil {
+		return nil, &remoteServerError{status: http.StatusInternalServerError, message: "could not create request: " + err.Error()}
+	}
+
+	if target.Token != "" {
+		req.Header.Set("X-Server-Token", target.Token)
+	}
+
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, &remoteServerError{status: http.StatusBadGateway, message: "could not reach remote server: " + err.Error()}
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, &remoteServerError{status: http.StatusUnauthorized, message: "remote server rejected authentication. Ensure tokens match."}
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &remoteServerError{status: resp.StatusCode, message: "remote server returned error"}
+	}
+
+	var movies []*structs.Movie
+	if err := json.NewDecoder(resp.Body).Decode(&movies); err != nil {
+		return nil, &remoteServerError{status: http.StatusInternalServerError, message: "failed to decode remote movies: " + err.Error()}
+	}
+
+	return movies, nil
 }
 
 func plexMoviePosterDir(plexDataDir string, hash string) string {

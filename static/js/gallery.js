@@ -114,6 +114,7 @@ import { FilterPanel } from '/static/js/filter.js';
 
 let allMovies = [];
 let filterPanel = null;
+let selectedServer = null;
 
 const movieProperties = [
     { value: 'title', label: 'Title' },
@@ -153,7 +154,7 @@ function renderGallery(movies) {
     }
 
     movies.forEach(movie => {
-        const card = createMovieCard(movie);
+        const card = createMovieCard(movie, selectedServer ? selectedServer.id : null);
         gallery.appendChild(card);
     });
 }
@@ -192,8 +193,16 @@ async function loadGallery() {
     const gallery = document.getElementById('movie-gallery');
     if (!gallery) return;
 
+    gallery.innerHTML = `
+        <div class="spinner-container">
+            <div class="spinner"></div>
+            <p class="loading-text">Loading movies...</p>
+        </div>
+    `;
+
     try {
-        const response = await fetch('/api/movies');
+        const moviesUrl = selectedServer ? `/api/servers/${selectedServer.id}/movies` : '/api/movies';
+        const response = await fetch(moviesUrl);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -227,5 +236,39 @@ async function loadGallery() {
     }
 }
 
+async function loadServerPicker() {
+    const picker = document.getElementById('server-picker');
+    if (!picker) return;
+
+    let serversById = new Map();
+
+    try {
+        const response = await fetch('/api/servers');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const servers = await response.json();
+        serversById = new Map(servers.map(server => [String(server.id), server]));
+        picker.innerHTML = '<option value="local">local</option>';
+        servers.forEach(server => {
+            const option = document.createElement('option');
+            option.value = String(server.id);
+            option.textContent = server.name || server.address || `Server ${server.id}`;
+            picker.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load servers:', error);
+    }
+
+    picker.addEventListener('change', () => {
+        selectedServer = picker.value === 'local' ? null : serversById.get(picker.value);
+        loadGallery();
+    });
+}
+
 // Initialize gallery on load
-document.addEventListener('DOMContentLoaded', loadGallery);
+document.addEventListener('DOMContentLoaded', () => {
+    loadServerPicker();
+    loadGallery();
+});
