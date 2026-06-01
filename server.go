@@ -50,9 +50,10 @@ func AuthMiddleware(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 		sessionToken, err := c.Cookie("session_token")
 		if err == nil {
 			if _, ok := auth.ValidateSession(sessionToken); ok {
+				csrfCookie, _ := c.Cookie("csrf_token")
+
 				// CSRF Protection for state-changing methods
 				if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "DELETE" {
-					csrfCookie, _ := c.Cookie("csrf_token")
 					csrfHeader := c.GetHeader("X-CSRF-Token")
 					if csrfCookie == "" || csrfHeader == "" || csrfCookie != csrfHeader {
 						c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch"})
@@ -60,8 +61,17 @@ func AuthMiddleware(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 					}
 				}
 
+				if csrfCookie == "" {
+					csrfCookie, err = auth.GenerateRandomToken()
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "could not generate CSRF token"})
+						return
+					}
+				}
+
 				c.SetSameSite(http.SameSiteLaxMode)
-				c.SetCookie("session_token", sessionToken, 1800, "/", "", secure, true)
+				c.SetCookie("session_token", sessionToken, sessionCookieMaxAge(), "/", "", secure, true)
+				c.SetCookie("csrf_token", csrfCookie, sessionCookieMaxAge(), "/", "", secure, false)
 				c.Next()
 				return
 			}
@@ -287,10 +297,14 @@ func loginSubmitHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 		csrfToken, _ := auth.GenerateRandomToken()
 
 		c.SetSameSite(http.SameSiteLaxMode)
-		c.SetCookie("session_token", token, 1800, "/", "", secure, true)
-		c.SetCookie("csrf_token", csrfToken, 1800, "/", "", secure, false)
+		c.SetCookie("session_token", token, sessionCookieMaxAge(), "/", "", secure, true)
+		c.SetCookie("csrf_token", csrfToken, sessionCookieMaxAge(), "/", "", secure, false)
 		c.JSON(http.StatusOK, gin.H{"message": "logged in"})
 	}
+}
+
+func sessionCookieMaxAge() int {
+	return int(auth.SessionDuration.Seconds())
 }
 
 func logoutHandler(c *gin.Context) {

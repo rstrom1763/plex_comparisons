@@ -169,6 +169,61 @@ func TestAuthMiddlewareAllowsSessionPOSTWithMatchingCSRF(t *testing.T) {
 	}
 }
 
+func TestAuthMiddlewareRefreshesCSRFCookie(t *testing.T) {
+	t.Setenv("PROTOCOL", "http")
+	dao := newTestLocalDAO(t)
+	sessionToken, err := auth.CreateSession("ryan")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() {
+		auth.DeleteSession(sessionToken)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/protected", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: sessionToken})
+	req.AddCookie(&http.Cookie{Name: "csrf_token", Value: "csrf-token"})
+	rec := httptest.NewRecorder()
+
+	newAuthTestRouter(dao).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	cookies := rec.Result().Cookies()
+	if !hasCookie(cookies, "session_token", sessionToken) {
+		t.Fatalf("session_token cookie was not refreshed: %v", cookies)
+	}
+	if !hasCookie(cookies, "csrf_token", "csrf-token") {
+		t.Fatalf("csrf_token cookie was not refreshed: %v", cookies)
+	}
+}
+
+func TestAuthMiddlewareRegeneratesMissingCSRFOnSafeRequest(t *testing.T) {
+	t.Setenv("PROTOCOL", "http")
+	dao := newTestLocalDAO(t)
+	sessionToken, err := auth.CreateSession("ryan")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	t.Cleanup(func() {
+		auth.DeleteSession(sessionToken)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/protected", nil)
+	req.AddCookie(&http.Cookie{Name: "session_token", Value: sessionToken})
+	rec := httptest.NewRecorder()
+
+	newAuthTestRouter(dao).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !hasCookieWithValue(cookiesByName(rec.Result().Cookies()), "csrf_token") {
+		t.Fatalf("csrf_token cookie was not regenerated: %v", rec.Result().Cookies())
+	}
+}
+
 func TestPlexMoviePosterDir(t *testing.T) {
 	got := plexMoviePosterDir(filepath.Join("plex", "data"), "abcdef")
 	want := filepath.Join("plex", "data", "Metadata", "Movies", "a", "bcdef.bundle", "Contents", "_combined", "posters")
@@ -928,6 +983,28 @@ func serveServerHandlerWithCookies(method string, route string, target string, h
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+func hasCookie(cookies []*http.Cookie, name string, value string) bool {
+	for _, cookie := range cookies {
+		if cookie.Name == name && cookie.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func cookiesByName(cookies []*http.Cookie) map[string]*http.Cookie {
+	byName := make(map[string]*http.Cookie, len(cookies))
+	for _, cookie := range cookies {
+		byName[cookie.Name] = cookie
+	}
+	return byName
+}
+
+func hasCookieWithValue(cookies map[string]*http.Cookie, name string) bool {
+	cookie, ok := cookies[name]
+	return ok && cookie.Value != ""
 }
 
 func serveHandlerWithParams(handler gin.HandlerFunc, params gin.Params) *httptest.ResponseRecorder {
