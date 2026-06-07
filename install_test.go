@@ -31,7 +31,7 @@ func TestInstallSystemdServiceWritesBinaryEnvAndService(t *testing.T) {
 	if got := readTestFile(t, cfg.BinaryPath); got != "binary-v1" {
 		t.Fatalf("installed binary = %q, want binary-v1", got)
 	}
-	if got := readTestFile(t, cfg.EnvPath); got != "PORT=8080\n" {
+	if got := readTestFile(t, cfg.EnvPath); got != "PORT=8080\nLOG_FILE="+filepath.Join(installDir, "plex_comparisons.log")+"\n" {
 		t.Fatalf("installed env = %q, want copied env", got)
 	}
 	service := readTestFile(t, cfg.ServicePath)
@@ -78,7 +78,7 @@ func TestInstallSystemdServiceIsIdempotentAndPreservesEnv(t *testing.T) {
 	if err := os.WriteFile(sourceEnv, []byte("PORT=9090\nPROTOCOL=http\n"), 0644); err != nil {
 		t.Fatalf("WriteFile(source env v2) error = %v", err)
 	}
-	if err := os.WriteFile(cfg.EnvPath, []byte("PORT=7777\n"), 0644); err != nil {
+	if err := os.WriteFile(cfg.EnvPath, []byte("PORT=7777\nLOG_FILE=/tmp/custom-plex.log\n"), 0644); err != nil {
 		t.Fatalf("WriteFile(installed env) error = %v", err)
 	}
 
@@ -89,7 +89,7 @@ func TestInstallSystemdServiceIsIdempotentAndPreservesEnv(t *testing.T) {
 	if got := readTestFile(t, cfg.BinaryPath); got != "binary-v2" {
 		t.Fatalf("installed binary after update = %q, want binary-v2", got)
 	}
-	if got := readTestFile(t, cfg.EnvPath); got != "PORT=7777\nPROTOCOL=http\n" {
+	if got := readTestFile(t, cfg.EnvPath); got != "PORT=7777\nLOG_FILE=/tmp/custom-plex.log\nPROTOCOL=http\n" {
 		t.Fatalf("installed env after update = %q, want preserved existing keys plus new defaults", got)
 	}
 }
