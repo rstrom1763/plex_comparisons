@@ -85,6 +85,13 @@ func runCLI(args []string) error {
 		if err != nil {
 			return fmt.Errorf("could not start server: %w", err)
 		}
+	case "install":
+		if len(args) != 2 {
+			return fmt.Errorf("expected 1 argument, got %d", len(args)-1)
+		}
+		if err := install(); err != nil {
+			return fmt.Errorf("could not install service: %w", err)
+		}
 
 	default:
 		return fmt.Errorf("unknown command: %s", arg)
