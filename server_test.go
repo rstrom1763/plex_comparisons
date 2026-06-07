@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -547,6 +549,7 @@ func TestServerHandlersValidateBadRequests(t *testing.T) {
 }
 
 func TestServerHandlersReturnInternalErrors(t *testing.T) {
+	chdirTemp(t)
 	dao, err := DAOS.NewLocalStateDAO(filepath.Join(t.TempDir(), "local_state.db"))
 	if err != nil {
 		t.Fatalf("NewLocalStateDAO() error = %v", err)
@@ -751,6 +754,7 @@ func TestDeleteFileHandler(t *testing.T) {
 }
 
 func TestCompareServerHandler(t *testing.T) {
+	chdirTemp(t)
 	dao := newTestLocalDAO(t)
 	db := newServerFixtureDB(t)
 
@@ -763,7 +767,8 @@ func TestCompareServerHandler(t *testing.T) {
 		if got := r.Header.Get("X-Server-Token"); got != "token" {
 			t.Fatalf("X-Server-Token = %q, want token", got)
 		}
-		_ = json.NewEncoder(w).Encode([]*structs.Movie{{Title: "Remote", Year: 2024}})
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write(gzipTestMovies(t, []*structs.Movie{{Title: "Remote", Year: 2024}}))
 	}))
 	t.Cleanup(remote.Close)
 	if err := dao.AddServer(structs.Server{Name: "Remote", Address: remote.URL, Token: "token"}); err != nil {
@@ -820,12 +825,13 @@ func TestCompareServerHandler(t *testing.T) {
 		t.Fatalf("Close(closedDB) error = %v", err)
 	}
 	rec = serveServerHandler(http.MethodGet, "/api/compare/:id", "/api/compare/1", compareServerHandler(dao, closedDB), nil)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("local DB compare status = %d, want 500", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cached local DB compare status = %d, want 200", rec.Code)
 	}
 }
 
 func TestGetServerMoviesHandler(t *testing.T) {
+	chdirTemp(t)
 	dao := newTestLocalDAO(t)
 
 	rec := serveServerHandler(http.MethodGet, "/api/servers/:id/movies", "/api/servers/1/movies", getServerMoviesHandler(dao), nil)
@@ -840,7 +846,8 @@ func TestGetServerMoviesHandler(t *testing.T) {
 		if got := r.Header.Get("X-Server-Token"); got != "token" {
 			t.Fatalf("X-Server-Token = %q, want token", got)
 		}
-		_ = json.NewEncoder(w).Encode([]*structs.Movie{{Title: "Remote Gallery", Year: 2026}})
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write(gzipTestMovies(t, []*structs.Movie{{Title: "Remote Gallery", Year: 2026}}))
 	}))
 	t.Cleanup(remote.Close)
 	if err := dao.AddServer(structs.Server{Name: "Remote", Address: remote.URL + "/", Token: "token"}); err != nil {
@@ -848,8 +855,15 @@ func TestGetServerMoviesHandler(t *testing.T) {
 	}
 
 	rec = serveServerHandler(http.MethodGet, "/api/servers/:id/movies", "/api/servers/1/movies", getServerMoviesHandler(dao), nil)
-	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte("Remote Gallery")) {
-		t.Fatalf("remote movies response = %d %q, want remote movie", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("remote movies status = %d, want 200; body = %q", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", rec.Header().Get("Content-Encoding"))
+	}
+	decompressed := gunzipTestBody(t, rec.Body.Bytes())
+	if !bytes.Contains(decompressed, []byte("Remote Gallery")) {
+		t.Fatalf("remote movies response = %q, want remote movie", string(decompressed))
 	}
 
 	unauthorizedRemote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -863,6 +877,26 @@ func TestGetServerMoviesHandler(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthorized remote status = %d, want 401", rec.Code)
 	}
+}
+
+func gunzipTestBody(t *testing.T, data []byte) []byte {
+	t.Helper()
+
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("gzip.NewReader() error = %v", err)
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Errorf("Close(gzip reader) error = %v", err)
+		}
+	}()
+
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(gzip reader) error = %v", err)
+	}
+	return decompressed
 }
 
 func TestRemoteThumbHandler(t *testing.T) {
@@ -891,10 +925,10 @@ func TestRemoteThumbHandler(t *testing.T) {
 		t.Fatalf("missing server status = %d, want 404", rec.Code)
 	}
 
-	if err := os.MkdirAll("thumb_cache", 0755); err != nil {
+	if err := os.MkdirAll(thumbnailCacheDir(), 0755); err != nil {
 		t.Fatalf("MkdirAll(thumb_cache) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join("thumb_cache", "cached.jpg"), []byte("cached"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(thumbnailCacheDir(), "cached.jpg"), []byte("cached"), 0644); err != nil {
 		t.Fatalf("WriteFile(cache) error = %v", err)
 	}
 	rec = serveServerHandler(http.MethodGet, "/remote-thumb/:id/:hash", "/remote-thumb/1/cached", remoteThumbHandler(dao, ""), nil)
@@ -931,7 +965,7 @@ func TestRemoteThumbHandler(t *testing.T) {
 	if rec.Code != http.StatusOK || rec.Body.String() != "remote-thumb" {
 		t.Fatalf("remote response = %d %q, want remote thumb", rec.Code, rec.Body.String())
 	}
-	if data, err := os.ReadFile(filepath.Join("thumb_cache", "remotehash.jpg")); err != nil || string(data) != "remote-thumb" {
+	if data, err := os.ReadFile(filepath.Join(thumbnailCacheDir(), "remotehash.jpg")); err != nil || string(data) != "remote-thumb" {
 		t.Fatalf("cached remote thumb = %q, err = %v; want remote-thumb", string(data), err)
 	}
 
@@ -1058,6 +1092,23 @@ func cookiesByName(cookies []*http.Cookie) map[string]*http.Cookie {
 func hasCookieWithValue(cookies map[string]*http.Cookie, name string) bool {
 	cookie, ok := cookies[name]
 	return ok && cookie.Value != ""
+}
+
+func chdirTemp(t *testing.T) {
+	t.Helper()
+
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("Chdir(temp) error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Errorf("Chdir(originalDir) error = %v", err)
+		}
+	})
 }
 
 func serveHandlerWithParams(handler gin.HandlerFunc, params gin.Params) *httptest.ResponseRecorder {

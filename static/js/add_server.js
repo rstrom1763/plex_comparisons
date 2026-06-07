@@ -3,23 +3,41 @@ import { authenticatedFetch, handleFetchError } from '/static/js/utils.js';
 let servers = [];
 
 async function fetchServers() {
-    const response = await fetch('/api/servers');
-    if (!response.ok) return await handleFetchError(response, 'fetch servers');
-    servers = await response.json();
+    const [serverResponse, localSnapshotResponse] = await Promise.all([
+        fetch('/api/servers'),
+        fetch('/api/snapshots/local')
+    ]);
+    if (!serverResponse.ok) return await handleFetchError(serverResponse, 'fetch servers');
+    servers = await serverResponse.json();
+    const localSnapshot = localSnapshotResponse.ok ? await localSnapshotResponse.json() : { snapshot_age: 'unknown' };
+
+    const listedServers = [
+        {
+            id: 'local',
+            name: 'local',
+            address: window.location.origin,
+            snapshot_age: localSnapshot.snapshot_age || 'never',
+            local: true
+        },
+        ...servers
+    ];
+
     const list = document.getElementById('server-list');
     list.innerHTML = '';
-    
-    servers.forEach(server => {
+
+    listedServers.forEach(server => {
         const li = document.createElement('li');
         li.className = 'server-item';
         li.innerHTML = `
             <div style="flex-grow: 1;">
                 <strong>${server.name}</strong> (${server.address})
-                ${server.token ? '<br><small style="color: var(--accent-color);">Token configured</small>' : '<br><small style="color: #ff4444;">No token configured</small>'}
+                ${server.local ? '<br><small style="color: var(--accent-color);">Local server</small>' : (server.token ? '<br><small style="color: var(--accent-color);">Token configured</small>' : '<br><small style="color: #ff4444;">No token configured</small>')}
+                <br><small>Snapshot: ${server.snapshot_age || 'never'}</small>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
-                <button class="btn btn-primary btn-edit" data-id="${server.id}">Edit</button>
-                <button class="btn btn-danger btn-delete" data-id="${server.id}">Delete</button>
+                <button class="btn btn-primary btn-snapshot" data-id="${server.id}">Take snapshot</button>
+                ${server.local ? '' : `<button class="btn btn-primary btn-edit" data-id="${server.id}">Edit</button>
+                <button class="btn btn-danger btn-delete" data-id="${server.id}">Delete</button>`}
             </div>
         `;
         list.appendChild(li);
@@ -31,6 +49,9 @@ async function fetchServers() {
     });
     document.querySelectorAll('.btn-edit').forEach(btn => {
         btn.addEventListener('click', () => startEdit(btn.dataset.id));
+    });
+    document.querySelectorAll('.btn-snapshot').forEach(btn => {
+        btn.addEventListener('click', () => takeSnapshot(btn.dataset.id));
     });
 }
 
@@ -93,6 +114,23 @@ async function deleteServer(id) {
         fetchServers();
     } else {
         await handleFetchError(response, 'delete server');
+    }
+}
+
+async function takeSnapshot(id) {
+    const button = document.querySelector(`.btn-snapshot[data-id="${id}"]`);
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Taking snapshot...';
+    }
+
+    const url = id === 'local' ? '/api/snapshots/local' : `/api/servers/${id}/snapshot`;
+    const response = await authenticatedFetch(url, { method: 'POST' });
+    if (response.ok) {
+        fetchServers();
+    } else {
+        await handleFetchError(response, 'take snapshot');
+        fetchServers();
     }
 }
 

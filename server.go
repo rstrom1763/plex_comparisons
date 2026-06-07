@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -97,9 +97,8 @@ func AuthMiddleware(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 }
 
 func RunServer() error {
-	// Ensure thumb_cache directory exists
-	if err := os.MkdirAll("thumb_cache", 0755); err != nil {
-		log.Printf("Warning: could not create thumb_cache directory: %v", err)
+	if err := ensureCacheDirs(); err != nil {
+		return err
 	}
 
 	err := godotenv.Load(constants.DOTENV_PATH)
@@ -194,6 +193,9 @@ func RunServer() error {
 	authorized.POST("/api/servers", createServerHandler(localDAO))
 	authorized.DELETE("/api/servers/:id", deleteServerHandler(localDAO))
 	authorized.GET("/api/servers/:id/movies", getServerMoviesHandler(localDAO))
+	authorized.POST("/api/servers/:id/snapshot", takeServerSnapshotHandler(localDAO))
+	authorized.GET("/api/snapshots/local", getLocalSnapshotHandler)
+	authorized.POST("/api/snapshots/local", takeLocalSnapshotHandler(plexDB))
 
 	authorized.GET("/api/filters", getFiltersHandler(localDAO))
 	authorized.POST("/api/filters", createFilterHandler(localDAO))
@@ -390,27 +392,23 @@ func pingHandler(c *gin.Context) {
 
 func compressedMoviesHandler(plexDB *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		movies, err := structs.GetMovies(plexDB)
-		if err != nil {
+		if _, err := readOrCreateLocalMovieSnapshot(plexDB); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		jsonData, err := json.Marshal(movies)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not marshal movies: " + err.Error()})
-			return
-		}
-
-		compressedData := utils.GzipData(jsonData)
-		if compressedData == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not gzip movies data"})
-			return
-		}
-
-		c.Header("Content-Encoding", "gzip")
-		c.Data(http.StatusOK, "application/json", compressedData)
+		sendCompressedMovieSnapshot(c, localSnapshotID)
 	}
+}
+
+func sendCompressedMovieSnapshot(c *gin.Context, snapshotID string) {
+	compressedData, err := os.ReadFile(movieSnapshotPath(snapshotID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not read movie snapshot: " + err.Error()})
+		return
+	}
+	c.Header("Content-Encoding", "gzip")
+	c.Data(http.StatusOK, "application/json", compressedData)
 }
 
 func compressedEpisodesHandler(plexDB *sql.DB) gin.HandlerFunc {
@@ -605,7 +603,7 @@ func remoteThumbHandler(localDAO *DAOS.LocalStateDAO, plexDataPath string) gin.H
 			return
 		}
 
-		cachePath := filepath.Join("thumb_cache", hash+".jpg")
+		cachePath := filepath.Join(thumbnailCacheDir(), hash+".jpg")
 		if _, err := os.Stat(cachePath); err == nil {
 			c.File(cachePath)
 			return
@@ -699,8 +697,23 @@ func getServersHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		for i := range servers {
+			applySnapshotMetadata(&servers[i], serverSnapshotID(servers[i].ID))
+		}
 		c.JSON(http.StatusOK, servers)
 	}
+}
+
+// Get timestamps from the files, insert into server metadata
+func applySnapshotMetadata(server *structs.Server, snapshotID string) {
+	server.SnapshotAge = snapshotAge(snapshotID)
+	if takenAt := snapshotTakenAt(snapshotID); takenAt != nil {
+		server.SnapshotTakenAt = takenAt.Format(time.RFC3339)
+	}
+}
+
+func serverSnapshotID(id int) string {
+	return fmt.Sprintf("server_%d", id)
 }
 
 func createServerHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
@@ -776,9 +789,14 @@ func getServerMoviesHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 			return
 		}
 
-		movies, err := fetchRemoteMovies(target)
+		snapshotID := serverSnapshotID(target.ID)
+		_, err = readOrCreateRemoteMovieSnapshot(snapshotSource{
+			ID:      snapshotID,
+			Address: target.Address,
+			Token:   target.Token,
+		})
 		if err != nil {
-			status := http.StatusBadGateway
+			status := http.StatusInternalServerError
 			if remoteErr, ok := err.(*remoteServerError); ok {
 				status = remoteErr.status
 			}
@@ -786,7 +804,61 @@ func getServerMoviesHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, movies)
+		sendCompressedMovieSnapshot(c, snapshotID)
+	}
+}
+
+func takeLocalSnapshotHandler(plexDB *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := takeLocalMovieSnapshot(plexDB); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"snapshot_age": snapshotAge(localSnapshotID),
+		})
+	}
+}
+
+func getLocalSnapshotHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"snapshot_age": snapshotAge(localSnapshotID),
+	})
+}
+
+func takeServerSnapshotHandler(localDAO *DAOS.LocalStateDAO) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, _ := strconv.Atoi(c.Param("id"))
+		servers, err := localDAO.GetServers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var target structs.Server
+		for _, server := range servers {
+			if server.ID == id {
+				target = server
+				break
+			}
+		}
+		if target.Address == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+			return
+		}
+
+		snapshotID := serverSnapshotID(target.ID)
+		if err := takeRemoteMovieSnapshot(snapshotSource{ID: snapshotID, Address: target.Address, Token: target.Token}); err != nil {
+			status := http.StatusBadGateway
+			if remoteErr, ok := err.(*remoteServerError); ok {
+				status = remoteErr.status
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"snapshot_age": snapshotAge(snapshotID),
+		})
 	}
 }
 
@@ -909,15 +981,19 @@ func compareServerHandler(localDAO *DAOS.LocalStateDAO, plexDB *sql.DB) gin.Hand
 			return
 		}
 
-		localMovies, err := structs.GetMovies(plexDB)
+		localMovies, err := readOrCreateLocalMovieSnapshot(plexDB)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		remoteMovies, err := fetchRemoteMovies(target)
+		remoteMovies, err := readOrCreateRemoteMovieSnapshot(snapshotSource{
+			ID:      serverSnapshotID(target.ID),
+			Address: target.Address,
+			Token:   target.Token,
+		})
 		if err != nil {
-			status := http.StatusBadGateway
+			status := http.StatusInternalServerError
 			if remoteErr, ok := err.(*remoteServerError); ok {
 				status = remoteErr.status
 			}
@@ -928,50 +1004,6 @@ func compareServerHandler(localDAO *DAOS.LocalStateDAO, plexDB *sql.DB) gin.Hand
 		remoteOnly, localOnly := compareDumps(localMovies, remoteMovies)
 		c.JSON(http.StatusOK, gin.H{"local_only": localOnly, "remote_only": remoteOnly})
 	}
-}
-
-type remoteServerError struct {
-	status  int
-	message string
-}
-
-func (e *remoteServerError) Error() string {
-	return e.message
-}
-
-func fetchRemoteMovies(target structs.Server) ([]*structs.Movie, error) {
-	req, err := http.NewRequest("GET", strings.TrimRight(target.Address, "/")+"/api/movies", nil)
-	if err != nil {
-		return nil, &remoteServerError{status: http.StatusInternalServerError, message: "could not create request: " + err.Error()}
-	}
-
-	if target.Token != "" {
-		req.Header.Set("X-Server-Token", target.Token)
-	}
-
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, &remoteServerError{status: http.StatusBadGateway, message: "could not reach remote server: " + err.Error()}
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, &remoteServerError{status: http.StatusUnauthorized, message: "remote server rejected authentication. Ensure tokens match."}
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, &remoteServerError{status: resp.StatusCode, message: "remote server returned error"}
-	}
-
-	var movies []*structs.Movie
-	if err := json.NewDecoder(resp.Body).Decode(&movies); err != nil {
-		return nil, &remoteServerError{status: http.StatusInternalServerError, message: "failed to decode remote movies: " + err.Error()}
-	}
-
-	return movies, nil
 }
 
 func plexMoviePosterDir(plexDataDir string, hash string) string {
