@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -105,6 +106,12 @@ func RunServer() error {
 	if err != nil {
 		return fmt.Errorf("could not load .env: %s", err.Error())
 	}
+
+	cleanupLogging, err := configureLoggingFromEnv()
+	if err != nil {
+		return fmt.Errorf("could not configure logging: %w", err)
+	}
+	defer cleanupLogging()
 
 	port := os.Getenv("PORT")
 	protocol := os.Getenv("PROTOCOL")
@@ -206,16 +213,16 @@ func RunServer() error {
 	authorized.PUT("/api/servers/:id", updateServerHandler(localDAO))
 	authorized.GET("/api/compare/:id", compareServerHandler(localDAO, plexDB))
 
-	fmt.Printf("Listening for %v on port %v...\n", protocol, port) //Notifies that server is running on X port
-	if protocol == "http" {                                        //Start running the Gin server
+	log.Printf("Listening for %v on port %v...", protocol, port) //Notifies that server is running on X port
+	if protocol == "http" {                                      //Start running the Gin server
 		err = r.Run(":" + port)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	} else if protocol == "https" {
 		err = r.RunTLS(":"+port, "./cert.pem", "./private.key")
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	} else {
 		return fmt.Errorf("unsupported protocol: %s", protocol)

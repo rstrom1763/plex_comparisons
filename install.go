@@ -75,6 +75,9 @@ func installSystemdService(cfg installConfig, run commandRunner) error {
 	if err := mergeEnvFile(cfg.SourceEnv, cfg.EnvPath, 0644); err != nil {
 		return fmt.Errorf("could not install env file: %w", err)
 	}
+	if err := ensureEnvValue(cfg.EnvPath, "LOG_FILE", defaultLogFilePath(cfg), 0644); err != nil {
+		return fmt.Errorf("could not configure log file: %w", err)
+	}
 
 	unit := systemdServiceUnit(cfg)
 	if err := writeFileIfChanged(cfg.ServicePath, []byte(unit), 0644); err != nil {
@@ -222,6 +225,31 @@ func mergeEnvFile(src string, dst string, mode os.FileMode) error {
 	}
 
 	return writeFileIfChanged(dst, merged.Bytes(), mode)
+}
+
+func ensureEnvValue(path string, key string, value string, mode os.FileMode) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return writeFileIfChanged(path, []byte(fmt.Sprintf("%s=%s\n", key, value)), mode)
+	}
+	if err != nil {
+		return err
+	}
+	if _, ok := envValue(data, key); ok {
+		return os.Chmod(path, mode)
+	}
+
+	var updated bytes.Buffer
+	updated.Write(data)
+	if updated.Len() > 0 && !strings.HasSuffix(updated.String(), "\n") {
+		updated.WriteByte('\n')
+	}
+	updated.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+	return writeFileIfChanged(path, updated.Bytes(), mode)
+}
+
+func defaultLogFilePath(cfg installConfig) string {
+	return filepath.Join(cfg.InstallDir, filepath.Base(constants.DEFAULT_LOG_FILE))
 }
 
 func envKeys(data []byte) map[string]bool {

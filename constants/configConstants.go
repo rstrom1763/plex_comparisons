@@ -8,6 +8,7 @@ const (
 
 	INSTALL_DIR          = "/opt/plex_comparisons"
 	INSTALLED_BINARY     = "/opt/plex_comparisons/plex_comparisons"
+	DEFAULT_LOG_FILE     = "/opt/plex_comparisons/plex_comparisons.log"
 	SYSTEMD_SERVICE_NAME = "plex-comparisons.service"
 	SYSTEMD_SERVICE_PATH = "/etc/systemd/system/plex-comparisons.service"
 )
