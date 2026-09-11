@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 
+	utils "github.com/rstrom1763/goUtils"
+	projectutils "github.com/rstrom1763/plex_comparisons/utils"
+
 	. "github.com/rstrom1763/plex_comparisons/structs"
 )
 
@@ -81,14 +84,34 @@ func compare(dumpFilePath1 string, dumpFilePath2 string, mediaType string) error
 
 	dump1NoHave, dump2NoHave := compareDumps(mediaItems1, mediaItems2)
 
-	err = writeCSV(addNoHaveToPath(dumpFilePath1), dump1NoHave)
+	err = writeCSV(projectutils.AddNoHaveToPath(dumpFilePath1), dump1NoHave)
 	if err != nil && err.Error() != "input is empty" {
 		return err
 	}
-	err = writeCSV(addNoHaveToPath(dumpFilePath2), dump2NoHave)
+	err = writeCSV(projectutils.AddNoHaveToPath(dumpFilePath2), dump2NoHave)
 	if err != nil && err.Error() != "input is empty" {
 		return err
 	}
 
 	return nil
+}
+
+func getByteSumFromDumpFile(dumpPath string, mediaType string) (int64, error) {
+	var byteSum int64
+
+	if !utils.FileExists(dumpPath) {
+		return 0, fmt.Errorf("%s does not exist", dumpPath)
+	}
+
+	items, err := getMediaItemsFromCSV(dumpPath, mediaType)
+	if err != nil {
+		return 0, fmt.Errorf("could not get media items from csv: %s", err.Error())
+	}
+
+	for _, item := range items {
+		byteSum += item.GetSizeBytes()
+	}
+
+	return byteSum, nil
+
 }

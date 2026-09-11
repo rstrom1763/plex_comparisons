@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rstrom1763/plex_comparisons/structs"
+	projectutils "github.com/rstrom1763/plex_comparisons/utils"
 )
 
 func TestInitMediaMap(t *testing.T) {
@@ -134,7 +135,7 @@ func TestCompareWritesNoHaveCSVs(t *testing.T) {
 		t.Fatalf("compare() error = %v", err)
 	}
 
-	firstNoHave, err := os.ReadFile(addNoHaveToPath(firstPath))
+	firstNoHave, err := os.ReadFile(projectutils.AddNoHaveToPath(firstPath))
 	if err != nil {
 		t.Fatalf("ReadFile(first no-have) error = %v", err)
 	}
@@ -142,7 +143,7 @@ func TestCompareWritesNoHaveCSVs(t *testing.T) {
 		t.Fatalf("first no-have CSV = %q, want Prometheus", string(firstNoHave))
 	}
 
-	secondNoHave, err := os.ReadFile(addNoHaveToPath(secondPath))
+	secondNoHave, err := os.ReadFile(projectutils.AddNoHaveToPath(secondPath))
 	if err != nil {
 		t.Fatalf("ReadFile(second no-have) error = %v", err)
 	}
@@ -202,4 +203,45 @@ func containsAll(s string, substrings []string) bool {
 		}
 	}
 	return true
+}
+
+func TestGetByteSumFromDumpFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "movies.csv")
+	data := (&testByteSumMovie{}).CSVHeaders() +
+		"Alien,,1979,,,,,,100,0,,0,,0,0,,,0.0,0.0,,0.00\n" +
+		"Aliens,,1986,,,,,,200,0,,0,,0,0,,,0.0,0.0,,0.00\n"
+	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	got, err := getByteSumFromDumpFile(path, "movie")
+	if err != nil {
+		t.Fatalf("getByteSumFromDumpFile() error = %v", err)
+	}
+	if got != 300 {
+		t.Fatalf("getByteSumFromDumpFile() = %d, want 300", got)
+	}
+}
+
+func TestGetByteSumFromDumpFileReturnsParseError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "movies.csv")
+	if err := os.WriteFile(path, []byte("not,a,valid,movie,csv\n"), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := getByteSumFromDumpFile(path, "movie"); err == nil {
+		t.Fatal("getByteSumFromDumpFile() error = nil, want error")
+	}
+}
+
+func TestGetByteSumFromDumpFileReturnsMissingFileError(t *testing.T) {
+	if _, err := getByteSumFromDumpFile(filepath.Join(t.TempDir(), "missing.csv"), "movie"); err == nil {
+		t.Fatal("getByteSumFromDumpFile() error = nil, want missing file error")
+	}
+}
+
+type testByteSumMovie struct{}
+
+func (m *testByteSumMovie) CSVHeaders() string {
+	return "title,rating,year,genre,library,media_type,file,hash,size,duration,container,bitrate,video_codec,height,width,resolution,audio_codec,critic_rating,audience_rating,metadata_hash,quality_score\n"
 }

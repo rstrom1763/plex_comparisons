@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"database/sql"
@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	utils "github.com/rstrom1763/goUtils"
+	_ "github.com/mattn/go-sqlite3"
 	. "github.com/rstrom1763/plex_comparisons/constants"
 )
 
 // Create the DB connection
-func initDB(path string) (*sql.DB, error) {
+func InitDB(path string) (*sql.DB, error) {
 
 	// Create the db connection
 	db, err := sql.Open("sqlite3", path)
@@ -31,7 +31,7 @@ func initDB(path string) (*sql.DB, error) {
 }
 
 // Get key from the env file
-func env(key string) (string, error) {
+func Env(key string) (string, error) {
 
 	// load .env file
 	err := godotenv.Load(DOTENV_PATH)
@@ -42,28 +42,17 @@ func env(key string) (string, error) {
 	return os.Getenv(key), nil
 }
 
-func addNoHaveToPath(path string) string {
+func AddNoHaveToPath(path string) string {
 	prefix := path[:strings.LastIndex(path, ".")]
 	fileExtension := path[strings.LastIndex(path, "."):]
 	return prefix + "_no_have" + fileExtension
 }
 
-func getByteSumFromDumpFile(dumpPath string, mediaType string) (int64, error) {
-	var byteSum int64
-
-	if !utils.FileExists(dumpPath) {
-		return 0, fmt.Errorf("%s does not exist", dumpPath)
+// ReplacePathPrefix replaces a literal, case-sensitive prefix without converting
+// separators. Missing mappings and paths that do not match are left unchanged.
+func ReplacePathPrefix(path, from, to string) string {
+	if from == "" || to == "" || !strings.HasPrefix(path, from) {
+		return path
 	}
-
-	items, err := getMediaItemsFromCSV(dumpPath, mediaType)
-	if err != nil {
-		return 0, fmt.Errorf("could not get media items from csv: %s", err.Error())
-	}
-
-	for _, item := range items {
-		byteSum += item.GetSizeBytes()
-	}
-
-	return byteSum, nil
-
+	return to + strings.TrimPrefix(path, from)
 }

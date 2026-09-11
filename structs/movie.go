@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	. "github.com/rstrom1763/plex_comparisons/constants"
+	"github.com/rstrom1763/plex_comparisons/utils"
 )
 
 type Movie struct {
@@ -165,6 +166,8 @@ func (m *Movie) CalculateQualityScore() {
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
+	pathFrom := os.Getenv("PLEX_MOVIE_PATH_FROM")
+	pathTo := os.Getenv("PLEX_MOVIE_PATH_TO")
 
 	rows, err := db.Query(MOVIE_DUMP_QUERY)
 	if err != nil {
@@ -212,7 +215,7 @@ func GetMovies(db *sql.DB) ([]*Movie, error) {
 			Genre:          Genre,
 			Library:        Library,
 			MediaType:      MediaType,
-			File:           File,
+			File:           utils.ReplacePathPrefix(File, pathFrom, pathTo),
 			Hash:           Hash,
 			Size:           Size,
 			Duration:       Duration,

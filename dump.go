@@ -8,11 +8,12 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	. "github.com/rstrom1763/plex_comparisons/structs"
+	projectutils "github.com/rstrom1763/plex_comparisons/utils"
 )
 
 func dump(plexDbPath string) error {
 
-	db, err := initDB(plexDbPath)
+	db, err := projectutils.InitDB(plexDbPath)
 	if err != nil {
 		return fmt.Errorf("there was an error initializing the DB connection: %w", err)
 	}

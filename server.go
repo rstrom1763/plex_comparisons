@@ -23,6 +23,7 @@ import (
 	"github.com/rstrom1763/plex_comparisons/auth"
 	"github.com/rstrom1763/plex_comparisons/constants"
 	"github.com/rstrom1763/plex_comparisons/structs"
+	projectutils "github.com/rstrom1763/plex_comparisons/utils"
 )
 
 //go:embed static
@@ -130,7 +131,7 @@ func RunServer() error {
 		_ = localDAO.Close()
 	}()
 
-	plexDB, err := initDB(plexDbPath)
+	plexDB, err := projectutils.InitDB(plexDbPath)
 	if err != nil {
 		return fmt.Errorf("there was an error initializing the DB connection: %w", err)
 	}

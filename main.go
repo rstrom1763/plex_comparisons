@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	utils "github.com/rstrom1763/goUtils"
+	projectutils "github.com/rstrom1763/plex_comparisons/utils"
 )
 
 func main() {
@@ -30,7 +31,7 @@ func runCLI(args []string) error {
 			return fmt.Errorf("expected 1 argument, got %d", len(args)-1)
 		}
 
-		plexDbPath, err := env("PLEX_DB_PATH")
+		plexDbPath, err := projectutils.Env("PLEX_DB_PATH")
 		if err != nil {
 			return fmt.Errorf("env variable PLEX_DB_PATH is empty")
 		}

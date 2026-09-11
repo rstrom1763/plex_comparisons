@@ -478,3 +478,94 @@ func writeCSVFixture(t *testing.T, header string, row []string) string {
 	}
 	return path
 }
+
+func TestMoviePathMapping(t *testing.T) {
+	// Add several movie records to the Plex fixture. Fetch them through GetMovies
+	// so the test exercises path correction during actual database loading.
+	db := newMediaTestDB(t)
+	fixtures := []struct{ title, original, mapped string }{
+		{"Alien", "/media/Alien.mkv", "/host/movies/Alien.mkv"},
+		{"Aliens", "/media/Sci Fi/Aliens.mkv", "/host/movies/Sci Fi/Aliens.mkv"},
+		{"Arrival", "/archive/Arrival.mkv", "/archive/Arrival.mkv"},
+		{"Moon", "/archive/media/Moon.mkv", "/archive/media/Moon.mkv"},
+		{"Contact", "/media/media/Contact.mkv", "/host/movies/media/Contact.mkv"},
+	}
+	for i, fixture := range fixtures[1:] {
+		id := 40 + i
+		if _, err := db.Exec(`INSERT INTO metadata_items
+			(id, metadata_type, title, content_rating, year, tags_genre, rating, audience_rating, hash)
+			VALUES (?, 1, ?, 'PG', 2000, 'Sci-Fi', 8.0, 8.0, ?)`, id, fixture.title, fixture.title); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO media_items
+			(id, metadata_item_id, library_section_id, container, bitrate, video_codec, height, width, audio_codec)
+			VALUES (?, ?, 1, 'mkv', 5000, 'h264', 1080, 1920, 'aac')`, id, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO media_parts (id, media_item_id, file, hash, size, duration)
+			VALUES (?, ?, ?, ?, 123456, 7000000)`, id, id, fixture.original, fixture.title); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, tt := range []struct {
+		name, from, to string
+		mapped         bool
+	}{
+		{"mapped", "/media/", "/host/movies/", true},
+		{"disabled", "", "", false},
+		{"missing source", "", "/host/movies/", false},
+		{"missing target", "/media/", "", false},
+		{"unmatched", "/unmounted/", "/host/", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("PLEX_MOVIE_PATH_FROM", tt.from)
+			t.Setenv("PLEX_MOVIE_PATH_TO", tt.to)
+			movies, err := GetMovies(db)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantPaths := make(map[string]string, len(fixtures))
+			for _, fixture := range fixtures {
+				wantPaths[fixture.title] = fixture.original
+				if tt.mapped {
+					wantPaths[fixture.title] = fixture.mapped
+				}
+			}
+			checkPaths := func(movies []*Movie) {
+				t.Helper()
+				if len(movies) != len(fixtures) {
+					t.Fatalf("got %d movies, want %d", len(movies), len(fixtures))
+				}
+				seen := make(map[string]bool)
+				for _, movie := range movies {
+					want, ok := wantPaths[movie.Title]
+					if !ok || seen[movie.Title] {
+						t.Fatalf("unexpected or duplicate movie %q", movie.Title)
+					}
+					seen[movie.Title] = true
+					if movie.File != want {
+						t.Errorf("%s path = %q, want %q", movie.Title, movie.File, want)
+					}
+				}
+			}
+			checkPaths(movies)
+			csv := movies[0].CSVHeaders()
+			for _, movie := range movies {
+				csv += movie.ToCSV()
+			}
+			path := filepath.Join(t.TempDir(), "movies.csv")
+			if err := os.WriteFile(path, []byte(csv), 0600); err != nil {
+				t.Fatal(err)
+			}
+			// Even a matching mapping must not alter CSV imports.
+			t.Setenv("PLEX_MOVIE_PATH_FROM", "/")
+			t.Setenv("PLEX_MOVIE_PATH_TO", "/changed/")
+			loaded, err := GetMoviesFromCSVFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkPaths(loaded)
+		})
+	}
+}
