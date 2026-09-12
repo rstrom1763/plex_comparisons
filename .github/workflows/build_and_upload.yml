@@ -29,6 +29,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Run tests
+        run: go test -count=1 ./...
+
       - name: Build binary for ${{ matrix.goos }}-${{ matrix.arch }}
         env:
           GOOS: ${{ matrix.goos }}
