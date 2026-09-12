@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rstrom1763/plex_comparisons/constants"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,12 +21,12 @@ var (
 	sessions  = make(map[string]Session)
 	sessionMu sync.RWMutex
 
-	SessionDuration = 30 * time.Minute
+	SessionDuration = constants.AUTH_SESSION_LENGTH_MINUTES * time.Minute
 )
 
 // GenerateRandomToken generates a 60-character hex token (30 bytes)
 func GenerateRandomToken() (string, error) {
-	b := make([]byte, 30)
+	b := make([]byte, constants.RANDOM_TOKEN_LENGTH)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
@@ -98,7 +99,7 @@ func DeleteSession(token string) {
 // CleanupSessions removes expired sessions from memory
 func CleanupSessions() {
 	for {
-		time.Sleep(5 * time.Minute)
+		time.Sleep(constants.AUTH_SESSION_CLEANUP_INTERVAL_MINUTES * time.Minute)
 		cleanupExpiredSessions(time.Now())
 	}
 }
