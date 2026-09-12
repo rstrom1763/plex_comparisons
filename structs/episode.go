@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	. "github.com/rstrom1763/plex_comparisons/constants"
+	"github.com/rstrom1763/plex_comparisons/utils"
 )
 
 type Episode struct {
@@ -159,6 +160,9 @@ func (e *Episode) CalculateQualityScore() {
 }
 
 func GetEpisodes(db *sql.DB) ([]*Episode, error) {
+	pathFrom := os.Getenv("PLEX_PATH_OVERRIDE_FROM")
+	pathTo := os.Getenv("PLEX_PATH_OVERRIDE_TO")
+
 	rows, err := db.Query(EPISODE_DUMP_QUERY)
 	if err != nil {
 		return nil, fmt.Errorf("could not query Episodes: %w", err)
@@ -213,7 +217,7 @@ func GetEpisodes(db *sql.DB) ([]*Episode, error) {
 			Year:           Year,
 			Library:        Library,
 			MediaType:      MediaType,
-			File:           File,
+			File:           utils.ReplacePathPrefix(File, pathFrom, pathTo),
 			Hash:           Hash,
 			Size:           Size,
 			Duration:       Duration,

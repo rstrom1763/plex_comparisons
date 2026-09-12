@@ -166,8 +166,8 @@ func (m *Movie) CalculateQualityScore() {
 }
 
 func GetMovies(db *sql.DB) ([]*Movie, error) {
-	pathFrom := os.Getenv("PLEX_MOVIE_PATH_FROM")
-	pathTo := os.Getenv("PLEX_MOVIE_PATH_TO")
+	pathFrom := os.Getenv("PLEX_PATH_OVERRIDE_FROM")
+	pathTo := os.Getenv("PLEX_PATH_OVERRIDE_TO")
 
 	rows, err := db.Query(MOVIE_DUMP_QUERY)
 	if err != nil {

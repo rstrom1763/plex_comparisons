@@ -152,6 +152,9 @@ func TestGetMovies(t *testing.T) {
 }
 
 func TestGetSongs(t *testing.T) {
+	t.Setenv("PLEX_PATH_OVERRIDE_FROM", "/media/")
+	t.Setenv("PLEX_PATH_OVERRIDE_TO", "/host/media/")
+
 	songs, err := GetSongs(newMediaTestDB(t))
 	if err != nil {
 		t.Fatalf("GetSongs() error = %v", err)
@@ -164,9 +167,15 @@ func TestGetSongs(t *testing.T) {
 	if got.Title != "Song" || got.AlbumTitle != "Album" || got.ArtistName != "Artist" {
 		t.Fatalf("song = %+v, want Song fixture", got)
 	}
+	if got.File != "/host/media/song.flac" {
+		t.Fatalf("File = %q, want mapped song path", got.File)
+	}
 }
 
 func TestGetEpisodes(t *testing.T) {
+	t.Setenv("PLEX_PATH_OVERRIDE_FROM", "/media/")
+	t.Setenv("PLEX_PATH_OVERRIDE_TO", "/host/media/")
+
 	episodes, err := GetEpisodes(newMediaTestDB(t))
 	if err != nil {
 		t.Fatalf("GetEpisodes() error = %v", err)
@@ -181,6 +190,9 @@ func TestGetEpisodes(t *testing.T) {
 	}
 	if got.MetadataHash != "episode-metadata" {
 		t.Fatalf("MetadataHash = %q, want %q", got.MetadataHash, "episode-metadata")
+	}
+	if got.File != "/host/media/show.mkv" {
+		t.Fatalf("File = %q, want mapped episode path", got.File)
 	}
 }
 

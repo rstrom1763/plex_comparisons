@@ -26,16 +26,19 @@ Set the `PLEX_DB_PATH` variable inside your `.env` file:
 
 > 💡 This is the default Plex database path on Ubuntu installations. Set it to wherever  your plex db file is
 
-For Plex running in a container, optionally map movie paths to the host OS
-in `.env`:
+For Plex running in a container, optionally map movie, episode, and song paths
+to the host OS in `.env`. All media types share the same mapping using
+`PLEX_PATH_OVERRIDE_FROM` and `PLEX_PATH_OVERRIDE_TO`:
 
 ```dotenv
-PLEX_MOVIE_PATH_FROM="/movies/"
-PLEX_MOVIE_PATH_TO="/mnt/media/movies/"
+PLEX_PATH_OVERRIDE_FROM="/media/"
+PLEX_PATH_OVERRIDE_TO="/mnt/media/"
 ```
 
-This turns `/movies/Alien.mkv` into `/mnt/media/movies/Alien.mkv` when
-loading movies from Plex, so exported CSVs contain the corrected paths.
+These settings turn `/media/movies/Alien.mkv` into `/mnt/media/movies/Alien.mkv`,
+`/media/tv/Show/S01E01.mkv` into `/mnt/media/tv/Show/S01E01.mkv`, and
+`/media/music/Artist/Song.flac` into `/mnt/media/music/Artist/Song.flac` when
+loading media from Plex, so exported CSVs contain the corrected paths.
 Matching is a literal, case-sensitive prefix replacement. Include trailing
 separators as shown to match a directory precisely; separators are not converted.
 If either value is empty or the prefix does not match, the path is unchanged.

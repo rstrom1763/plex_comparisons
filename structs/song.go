@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	. "github.com/rstrom1763/plex_comparisons/constants"
+	"github.com/rstrom1763/plex_comparisons/utils"
 )
 
 type Song struct {
@@ -83,6 +84,9 @@ func (s *Song) CSVHeaders() string {
 }
 
 func GetSongs(db *sql.DB) ([]*Song, error) {
+	pathFrom := os.Getenv("PLEX_PATH_OVERRIDE_FROM")
+	pathTo := os.Getenv("PLEX_PATH_OVERRIDE_TO")
+
 	rows, err := db.Query(SONG_DUMP_QUERY)
 	if err != nil {
 		return nil, fmt.Errorf("could not query Songs: %w", err)
@@ -124,7 +128,7 @@ func GetSongs(db *sql.DB) ([]*Song, error) {
 			ArtistName:   ArtistName,
 			Library:      Library,
 			MediaType:    MediaType,
-			File:         File,
+			File:         utils.ReplacePathPrefix(File, pathFrom, pathTo),
 			Hash:         Hash,
 			Size:         Size,
 			Duration:     Duration,

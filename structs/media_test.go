@@ -519,8 +519,8 @@ func TestMoviePathMapping(t *testing.T) {
 		{"unmatched", "/unmounted/", "/host/", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("PLEX_MOVIE_PATH_FROM", tt.from)
-			t.Setenv("PLEX_MOVIE_PATH_TO", tt.to)
+			t.Setenv("PLEX_PATH_OVERRIDE_FROM", tt.from)
+			t.Setenv("PLEX_PATH_OVERRIDE_TO", tt.to)
 			movies, err := GetMovies(db)
 			if err != nil {
 				t.Fatal(err)
@@ -559,8 +559,8 @@ func TestMoviePathMapping(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Even a matching mapping must not alter CSV imports.
-			t.Setenv("PLEX_MOVIE_PATH_FROM", "/")
-			t.Setenv("PLEX_MOVIE_PATH_TO", "/changed/")
+			t.Setenv("PLEX_PATH_OVERRIDE_FROM", "/")
+			t.Setenv("PLEX_PATH_OVERRIDE_TO", "/changed/")
 			loaded, err := GetMoviesFromCSVFile(path)
 			if err != nil {
 				t.Fatal(err)
