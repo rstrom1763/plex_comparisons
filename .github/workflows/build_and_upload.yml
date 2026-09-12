@@ -30,7 +30,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests
-        run: go test -count=1 ./...
+        run: go test -count=1 -cover ./...
 
       - name: Build binary for ${{ matrix.goos }}-${{ matrix.arch }}
         env:
